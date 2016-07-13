@@ -13,7 +13,7 @@ What I have tried to do here is implement an SMPP server which connects to the b
 * :white_check_mark: HTTP based routing support
 * :white_check_mark: Prepaid billing support
 * :white_check_mark: Multiple bearerbox connections 
-* :white_check_mark: Throttling support (Complete) 
+* :white_check_mark: Throttling support 
 * :white_check_mark: Full support for simulation (delivery reports, MO, failures)
 * :white_check_mark: Fully asynchronous 
 * :white_check_mark: submit_sm_resp PDU's only provided once bearerbox or database has accepted storage 
