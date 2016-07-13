@@ -4,20 +4,20 @@ This is my attempt at an alternative to OpenSMPPBox and the Commercial SMPPBox a
 
 What I have tried to do here is implement an SMPP server which connects to the bearerbox as currently SMSBox with the following features:
 
-:white_check_mark: Not bound by threads per client (built with libevent) 
-:white_check_mark: Fast start up and regardless of workload/queues 
-:white_check_mark: Limited memory usage (disk based excess queue storage)
-:white_check_mark: Database authentication support 
-:white_check_mark: Database routing support 
-:white_check_mark: HTTP based authentication support
-:white_check_mark: HTTP based routing support
-:white_check_mark: Prepaid billing support
-:white_check_mark: Multiple bearerbox connections 
-:white_check_mark: Throttling support (Complete) 
-:white_check_mark: Full support for simulation (delivery reports, MO, failures)
-:white_check_mark: Fully asynchronous 
-:white_check_mark: submit_sm_resp PDU's only provided once bearerbox or database has accepted storage 
-:white_check_mark: HTTP routers use a callback mechanism
+* :white_check_mark: Not bound by threads per client (built with libevent) 
+* :white_check_mark: Fast start up and regardless of workload/queues 
+* :white_check_mark: Limited memory usage (disk based excess queue storage)
+* :white_check_mark: Database authentication support 
+* :white_check_mark: Database routing support 
+* :white_check_mark: HTTP based authentication support
+* :white_check_mark: HTTP based routing support
+* :white_check_mark: Prepaid billing support
+* :white_check_mark: Multiple bearerbox connections 
+* :white_check_mark: Throttling support (Complete) 
+* :white_check_mark: Full support for simulation (delivery reports, MO, failures)
+* :white_check_mark: Fully asynchronous 
+* :white_check_mark: submit_sm_resp PDU's only provided once bearerbox or database has accepted storage 
+* :white_check_mark: HTTP routers use a callback mechanism
 
 ### TO-DO
 * Embeddable code (almost, just some thread joins to deal with)
