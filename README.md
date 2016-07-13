@@ -81,12 +81,14 @@ http://ksmppdhost:port/esme-status
     -- id:5 uptime:0d 0h 0m 11s, type:1, open-acks:0, inbound (load/queued/processed/routing):0.00/0/1/0, outbound (load/queued/processed):0.00/0/1
 
 http://ksmppdhost:port/esme-unbind
+
     curl "http://localhost:14010/esme-unbind?password=ksmppdpass&system-id=smppuserb&bind-id=1"
     1 binds disconnected
     curl "http://localhost:14010/esme-unbind?password=ksmppdpass&system-id=smppuserb"
     2 binds disconnected   
 
 http://ksmppd:port/rebuild-routes (you MUST run this if you change routes in the database)
+
     curl "http://localhost:14010/rebuild-routes?password=ksmppdpass
     Routes updated
 
