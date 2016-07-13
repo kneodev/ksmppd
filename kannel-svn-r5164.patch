@@ -1,0 +1,186 @@
+Index: gw/load.c
+===================================================================
+--- gw/load.c	(revision 5164)
++++ gw/load.c	(working copy)
+@@ -67,7 +67,7 @@
+ struct load_entry {
+     float prev;
+     float curr;
+-    time_t last;
++    double last;
+     int interval;
+     int dirty;
+ };
+@@ -80,7 +80,25 @@
+     RWLock *lock;
+ };
+ 
++double microtime(double *p) {
++    struct timeval tv;
++    struct timezone tz;
++    struct tm *tm;
++    gettimeofday(&tv, &tz);
++    
++    double result = tv.tv_sec + (1e-6 * tv.tv_usec);
++    
++    if(p != NULL) {
++        *p = result;
++    }
++    
++    return result;
++}
+ 
++double microtime_diff(double end, double start) {
++    return (end - start);
++}
++
+ Load* load_create_real(int heuristic)
+ {
+     struct load *load;
+@@ -117,7 +135,7 @@
+     entry->prev = entry->curr = 0.0;
+     entry->interval = interval;
+     entry->dirty = 1;
+-    time(&entry->last);
++    microtime(&entry->last);
+     
+     load->entries = gw_realloc(load->entries, sizeof(struct load*) * (load->len + 1));
+     load->entries[load->len] = entry;
+@@ -147,17 +165,17 @@
+ 
+ void load_increase_with(Load *load, unsigned long value)
+ {
+-    time_t now;
++    double now;
+     int i;
+     
+     if (load == NULL)
+         return;
+     gw_rwlock_wrlock(load->lock);
+-    time(&now);
++    microtime(&now);
+     for (i = 0; i < load->len; i++) {
+         struct load_entry *entry = load->entries[i];
+         /* check for special case, load over whole live time */
+-        if (entry->interval != -1 && now >= entry->last + entry->interval) {
++        if((entry->interval != -1 && now >= entry->last + entry->interval)) { 
+             /* rotate */
+             entry->curr /= entry->interval;
+             if (entry->prev > 0)
+@@ -174,10 +192,10 @@
+ }
+ 
+ 
+-float load_get(Load *load, int pos)
++double load_get(Load *load, int pos)
+ {
+-    float ret;
+-    time_t now;
++    double ret;
++    double now;
+     struct load_entry *entry;
+ 
+     if (load == NULL || pos >= load->len) {
+@@ -187,13 +205,13 @@
+     /* first maybe rotate load */
+     load_increase_with(load, 0);
+     
+-    time(&now);
++    microtime(&now);
+     gw_rwlock_rdlock(load->lock);
+     entry = load->entries[pos];
+     if (load->heuristic && !entry->dirty) {
+         ret = entry->prev;
+     } else {
+-        time_t diff = (now - entry->last);
++        double diff = (now - entry->last);
+         if (diff == 0) diff = 1;
+         ret = entry->curr/diff;
+     }
+Index: gw/load.h
+===================================================================
+--- gw/load.h	(revision 5164)
++++ gw/load.h	(working copy)
+@@ -102,7 +102,7 @@
+ /**
+  * Get measured load value at position @pos.
+  */
+-float load_get(Load *load, int pos);
++double load_get(Load *load, int pos);
+ 
+ /**
+  * Get length of intervals.
+@@ -109,4 +109,8 @@
+  */
+ int load_len(Load *load);
+ 
++/* Times with microseconds */
++double microtime(double *p);
++double microtime_diff(double end, double start);
++
+ #endif
+Index: gw/smsc/smpp_pdu.c
+===================================================================
+--- gw/smsc/smpp_pdu.c	(revision 5164)
++++ gw/smsc/smpp_pdu.c	(working copy)
+@@ -402,7 +402,7 @@
+ }
+ 
+ 
+-Octstr *smpp_pdu_pack(Octstr *smsc_id, SMPP_PDU *pdu)
++Octstr *smpp_pdu_pack_real(Octstr *smsc_id, SMPP_PDU *pdu, int include_len)
+ {
+     Octstr *os;
+     Octstr *temp;
+@@ -532,15 +532,22 @@
+         break;
+     }
+ 
+-    temp = octstr_create("");
+-    append_encoded_integer(temp, octstr_len(os) + 4, 4);
+-    octstr_insert(os, temp, 0);
+-    octstr_destroy(temp);
++    if(include_len) {
++        temp = octstr_create("");
++        append_encoded_integer(temp, octstr_len(os) + 4, 4);
++        octstr_insert(os, temp, 0);
++        octstr_destroy(temp);
++    }
+ 
+     return os;
+ }
+ 
++Octstr *smpp_pdu_pack(Octstr *smsc_id, SMPP_PDU *pdu)
++{
++    return smpp_pdu_pack_real(smsc_id, pdu, 1);
++}
+ 
++
+ SMPP_PDU *smpp_pdu_unpack(Octstr *smsc_id, Octstr *data_without_len)
+ {
+     SMPP_PDU *pdu;
+Index: gw/smsc/smpp_pdu.h
+===================================================================
+--- gw/smsc/smpp_pdu.h	(revision 5164)
++++ gw/smsc/smpp_pdu.h	(working copy)
+@@ -234,6 +234,7 @@
+ SMPP_PDU *smpp_pdu_create(unsigned long type, unsigned long seq_no);
+ void smpp_pdu_destroy(SMPP_PDU *pdu);
+ int smpp_pdu_is_valid(SMPP_PDU *pdu); /* XXX */
++Octstr *smpp_pdu_pack_real(Octstr *smsc_id, SMPP_PDU *pdu, int include_len);
+ Octstr *smpp_pdu_pack(Octstr *smsc_id, SMPP_PDU *pdu);
+ SMPP_PDU *smpp_pdu_unpack(Octstr *smsc_id, Octstr *data_without_len);
+ void smpp_pdu_dump(Octstr *smsc_id, SMPP_PDU *pdu);
+Index: gwlib/dbpool_mysql.c
+===================================================================
+--- gwlib/dbpool_mysql.c	(revision 5164)
++++ gwlib/dbpool_mysql.c	(working copy)
+@@ -223,7 +223,7 @@
+     for (i = 0; i < binds_len; i++) {
+         MYSQL_FIELD *field = mysql_fetch_field(result); /* retrieve field metadata */
+ 
+-        debug("gwlib.dbpool_mysql", 0, "column=%s buffer_type=%d max_length=%ld length=%ld", field->name, field->type, field->max_length, field->length);
++//        debug("gwlib.dbpool_mysql", 0, "column=%s buffer_type=%d max_length=%ld length=%ld", field->name, field->type, field->max_length, field->length);
+ 
+         switch(field->type) {
+         case MYSQL_TYPE_TIME:
