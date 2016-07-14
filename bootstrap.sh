@@ -49,7 +49,7 @@ safe_exec "make libgw.a libgwlib.a libwap.a gw-config"
 
 cd $BUILD_PATH
 
-safe_exec "curl -O -J -L  https://github.com/libevent/libevent/releases/download/release-2.0.22-stable/libevent-2.0.22-stable.tar.gz"
+safe_exec "curl -O -L  https://github.com/libevent/libevent/releases/download/release-2.0.22-stable/libevent-2.0.22-stable.tar.gz"
 
 tar zxvf libevent-2.0.22-stable.tar.gz
 
