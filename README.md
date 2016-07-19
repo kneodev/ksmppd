@@ -4,28 +4,30 @@ This is my attempt at an alternative to OpenSMPPBox and the Commercial SMPPBox a
 
 What I have tried to do here is implement an SMPP server which connects to the bearerbox as currently SMSBox with the following features:
 
-* Not bound by threads per client (built with libevent) :white_check_mark:
-* Fast start up and regardless of workload/queues :white_check_mark:
-* Limited memory usage (disk based excess queue storage) :white_check_mark:
-* Database authentication support :white_check_mark:
-* Database routing support :white_check_mark:
-* HTTP based authentication support :white_check_mark:
-* HTTP based routing support :white_check_mark:
-* Prepaid billing support :white_check_mark:
-* Multiple bearerbox connections :white_check_mark:
-* Throttling support (Complete) :white_check_mark:
-* Full support for simulation (delivery reports, MO, failures) :white_check_mark:
-* Fully asynchronous :white_check_mark:
-** submit_sm_resp PDU's only provided once bearerbox or database has accepted storage :white_check_mark:
-** HTTP routers use a callback mechanism :white_check_mark:
+* :white_check_mark: Not bound by threads per client (built with libevent) 
+* :white_check_mark: Fast start up and regardless of workload/queues 
+* :white_check_mark: Limited memory usage (disk based excess queue storage)
+* :white_check_mark: Database authentication support 
+* :white_check_mark: Database routing support 
+* :white_check_mark: HTTP based authentication support
+* :white_check_mark: HTTP based routing support
+* :white_check_mark: Prepaid billing support
+* :white_check_mark: Multiple bearerbox connections 
+* :white_check_mark: Throttling support 
+* :white_check_mark: Full support for simulation (delivery reports, MO, failures)
+* :white_check_mark: Fully asynchronous 
+* :white_check_mark: submit_sm_resp PDU's only provided once bearerbox or database has accepted storage 
+* :white_check_mark: HTTP routers use a callback mechanism
+
+### TO-DO
 * Embeddable code (almost, just some thread joins to deal with)
-* ? others proposed via issue tracker
+* others proposed via issue tracker
 
 This software will be free, forever. If you get charged for this software, please notify me.
 
 If you do wish to donate to this project, please do so via the bitcoin address below.
 
-BTC address: 1NhLkTDiZtFTJMefvjQY4pUWM3jD641jWN
+### BTC address: 1NhLkTDiZtFTJMefvjQY4pUWM3jD641jWN
 
 ## Building
 
@@ -55,7 +57,7 @@ If using a database in any of the above examples, you will need to create the ta
 
 There are commands available via the built in HTTP server which allow you to perform certain tasks. Appending ".xml" to commands will produce output in XML format.
 
-* http://ksmppdhost:port/esme-status
+http://ksmppdhost:port/esme-status
 
     curl "http://localhost:14010/esme-status?password=ksmppdpass"
     Summary: 
@@ -78,13 +80,15 @@ There are commands available via the built in HTTP server which allow you to per
     -- id:2 uptime:0d 0h 0m 11s, type:2, open-acks:0, inbound (load/queued/processed/routing):0.00/0/1/0, outbound (load/queued/processed):0.00/0/1
     -- id:5 uptime:0d 0h 0m 11s, type:1, open-acks:0, inbound (load/queued/processed/routing):0.00/0/1/0, outbound (load/queued/processed):0.00/0/1
 
-* http://ksmppdhost:port/esme-unbind
+http://ksmppdhost:port/esme-unbind
+
     curl "http://localhost:14010/esme-unbind?password=ksmppdpass&system-id=smppuserb&bind-id=1"
     1 binds disconnected
     curl "http://localhost:14010/esme-unbind?password=ksmppdpass&system-id=smppuserb"
     2 binds disconnected   
 
-* http://ksmppd:port/rebuild-routes (you MUST run this if you change routes in the database)
+http://ksmppd:port/rebuild-routes (you MUST run this if you change routes in the database)
+
     curl "http://localhost:14010/rebuild-routes?password=ksmppdpass
     Routes updated
 
@@ -128,6 +132,8 @@ All scenarios will allow ESME's to authenticate as normal, unless the database i
 ## Acknowledgements
 
 This product includes software developed by the Kannel Group (http://www.kannel.org/).
+
+I'd also like to specifically thank the developer of OpenSMPPBox Rene Kluwen as I used some of his PDU conversion mechanisms in OpenSMPPBox.
 
 It makes extensive use of gwlib and other features developed for Kannel, it would not be possible without them.
 
