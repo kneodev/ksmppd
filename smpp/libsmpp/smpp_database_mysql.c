@@ -683,18 +683,22 @@ int smpp_database_mysql_deduct_credit(SMPPServer *context, Octstr *service, doub
     gwlist_destroy(result, NULL);
     
     if(balance_ok) {
-        cost_str = octstr_format("%f", cost);
-        sql = octstr_format("UPDATE %S SET `credit` = `credit` - ? WHERE `system_id` = ?", smpp_server->database_user_table);
-        binds = gwlist_create();
-        gwlist_append(binds, cost_str);
-        gwlist_append(binds, service);
-        if(dbpool_conn_update(pconn, sql, binds) < 1) {
-            error(0, "Error deducting credit from %s", octstr_get_cstr(service));
-            balance_ok = 0;
+        if(cost != 0.0) {
+            cost_str = octstr_format("%f", cost);
+            sql = octstr_format("UPDATE %S SET `credit` = `credit` - ? WHERE `system_id` = ?", smpp_server->database_user_table);
+            binds = gwlist_create();
+            gwlist_append(binds, cost_str);
+            gwlist_append(binds, service);
+            if(dbpool_conn_update(pconn, sql, binds) < 1) {
+                error(0, "Error deducting %f credit from %s", cost, octstr_get_cstr(service));
+                balance_ok = 0;
+            }
+            gwlist_destroy(binds, NULL);
+            octstr_destroy(sql);
+            octstr_destroy(cost_str);
+        } else {
+            debug("smpp.database.mysql.deduct.credit", 0, "Cost is zero, no query to run");
         }
-        gwlist_destroy(binds, NULL);
-        octstr_destroy(sql);
-        octstr_destroy(cost_str);
     }
     
     dbpool_conn_produce(pconn);
