@@ -2,7 +2,7 @@
 
 This is my attempt at an alternative to OpenSMPPBox and the Commercial SMPPBox available
 
-I would recommend reading this page in its entiriety and then moving on to the [wiki|https://github.com/kneodev/ksmppd/wiki] for more details.
+I would recommend reading this page in its entiriety and then moving on to the [wiki](https://github.com/kneodev/ksmppd/wiki) for more details.
 
 What I have tried to do here is implement an SMPP server which connects to the bearerbox as currently SMSBox with the following features:
 
