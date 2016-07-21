@@ -195,7 +195,7 @@ void smpp_queues_submit_routing_done(void *context, int result, double cost) {
     SMPPQueuedPDU *smpp_queued_response_pdu = context;
     counter_decrease(smpp_queued_response_pdu->smpp_esme->pending_routing);
     if(result) {
-        if(smpp_database_deduct_credit(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->smpp_esme->system_id, cost)) {
+        if(!smpp_queued_response_pdu->smpp_esme->smpp_esme_global->enable_prepaid_billing || smpp_database_deduct_credit(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->smpp_esme->system_id, cost)) {
             info(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);
             smpp_bearerbox_add_message(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->msg, smpp_queues_callback_submit_sm, smpp_queued_response_pdu);
         } else {
@@ -209,7 +209,7 @@ void smpp_queues_submit_routing_done(void *context, int result, double cost) {
         }
     } else {
         if(octstr_len(smpp_queued_response_pdu->msg->sms.smsc_id)) {
-            if(smpp_database_deduct_credit(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->smpp_esme->system_id, smpp_queued_response_pdu->smpp_esme->default_cost)) {
+            if(!smpp_queued_response_pdu->smpp_esme->smpp_esme_global->enable_prepaid_billing || smpp_database_deduct_credit(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->smpp_esme->system_id, smpp_queued_response_pdu->smpp_esme->default_cost)) {
                 info(0, "SMPP[%s] Using default routing for %s to %s for cost %f", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), smpp_queued_response_pdu->smpp_esme->default_cost);
                 smpp_bearerbox_add_message(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->msg, smpp_queues_callback_submit_sm, smpp_queued_response_pdu);
             } else {
