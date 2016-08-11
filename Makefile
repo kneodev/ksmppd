@@ -3,7 +3,7 @@ SHELL = /bin/sh
 KANNEL_PATH=./kannel-svn-trunk
 CC = gcc
 CFLAGS = `${KANNEL_PATH}/gw-config --cflags` -I${KANNEL_PATH} -O1 -Wall -I. -I./smpp -I`pwd`/build/include -I/sw/include -fPIC  
-LIBS = `${KANNEL_PATH}/gw-config --libs` -L${KANNEL_PATH} -L/sw/lib -L/usr/lib -L`pwd`/build/libevent/.libs -levent -rdynamic
+LIBS = `${KANNEL_PATH}/gw-config --libs` -L${KANNEL_PATH} -L/sw/lib -L/usr/lib -L`pwd`/build/libevent/.libs -levent -rdynamic -lrt
 
 # platform specific shared library extentions and flags
 DSO_EXT = so
