@@ -63,6 +63,7 @@
 #include "gwlib/gwlib.h"
 #include "gw/load.h"
 #include "gw/msg.h"
+#include "gw/smsc/smpp_pdu.h"
 #include "smpp_server.h"
 #include "smpp_esme.h"
 #include "smpp_http_client.h"
@@ -83,9 +84,10 @@ typedef struct {
     Octstr *smsc_id;
     int direction;
     Msg *msg;
-    void(*callback)(void *context, int result, double cost);
+    void(*callback)(void *context, SMPPRouteStatus *smpp_route_status);
     void *context;
     SMPPHTTPRouting *smpp_http_routing;
+    SMPPRouteStatus *smpp_route_status;
 } SMPPHTTPQueuedRoute;
 
 SMPPHTTPQueuedRoute *smpp_http_queued_route_create() {
@@ -97,6 +99,7 @@ SMPPHTTPQueuedRoute *smpp_http_queued_route_create() {
     smpp_http_queued_route->smsc_id = NULL;
     smpp_http_queued_route->system_id = NULL;
     smpp_http_queued_route->smpp_http_routing = NULL;
+    smpp_http_queued_route->smpp_route_status = NULL;
     return smpp_http_queued_route;
 }
 
@@ -214,8 +217,7 @@ void smpp_http_client_receive_thread(void *arg) {
     
     int route_status;
     double route_cost;
-
-
+    
     Octstr *header_key, *header_val;
 
     while ((smpp_http_queued_route = http_receive_result(caller, &status, &final_url, &response_headers, &body)) != NULL) {
@@ -279,26 +281,33 @@ void smpp_http_client_receive_thread(void *arg) {
                         }
                         
                         msg_destroy(old_message);
+                        
+                        smpp_http_queued_route->smpp_route_status->status = SMPP_ESME_ROK;
+                        smpp_http_queued_route->smpp_route_status->cost = route_cost;
 
-                        smpp_http_queued_route->callback(smpp_http_queued_route->context, 1, route_cost);
+                        smpp_http_queued_route->callback(smpp_http_queued_route->context, smpp_http_queued_route->smpp_route_status);
 
                     } else {
                         warning(0, SMPP_HTTP_HEADER_PREFIX "Route-Cost header returned, was not valid number, failing");
-                        smpp_http_queued_route->callback(smpp_http_queued_route->context, 0,0);
+                        smpp_http_queued_route->smpp_route_status->status = SMPP_ESME_RSUBMITFAIL;
+                        smpp_http_queued_route->callback(smpp_http_queued_route->context, smpp_http_queued_route->smpp_route_status);
                         octstr_destroy(header_val);
                     }
                     
                 } else {
                     warning(0, "No " SMPP_HTTP_HEADER_PREFIX "Route-Cost header returned, failing message");
-                    smpp_http_queued_route->callback(smpp_http_queued_route->context, 0,0);
+                    smpp_http_queued_route->smpp_route_status->status = SMPP_ESME_RSUBMITFAIL;
+                    smpp_http_queued_route->callback(smpp_http_queued_route->context, smpp_http_queued_route->smpp_route_status);
                 }
             } else {
-                warning(0, SMPP_HTTP_HEADER_PREFIX"Route-Status indicated routing failure (code %d), rejecting", route_status);
-                smpp_http_queued_route->callback(smpp_http_queued_route->context, 0,0);
+                warning(0, SMPP_HTTP_HEADER_PREFIX "Route-Status indicated routing failure (code %d), rejecting", route_status);
+                smpp_http_queued_route->smpp_route_status->status = SMPP_ESME_RSUBMITFAIL;
+                smpp_http_queued_route->callback(smpp_http_queued_route->context, smpp_http_queued_route->smpp_route_status);
             }
         } else {
             warning(0, "No " SMPP_HTTP_HEADER_PREFIX "Route-Status header returned, failing message");
-            smpp_http_queued_route->callback(smpp_http_queued_route->context, 0,0);
+            smpp_http_queued_route->smpp_route_status->status = SMPP_ESME_RSUBMITFAIL;
+            smpp_http_queued_route->callback(smpp_http_queued_route->context, smpp_http_queued_route->smpp_route_status);
         }
         
         smpp_http_queued_route_destroy(smpp_http_queued_route);
@@ -411,7 +420,7 @@ void smpp_http_client_request_thread(void *arg) {
     http_caller_destroy(caller);
 }
 
-void smpp_http_client_route_message(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, int result, double cost), void *context) {
+void smpp_http_client_route_message(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context) {
     SMPPRouting *smpp_routing = smpp_server->routing;
     SMPPHTTPRouting *smpp_http_routing = smpp_routing->context;
     SMPPHTTPQueuedRoute *smpp_http_queued_route = smpp_http_queued_route_create();
@@ -422,6 +431,7 @@ void smpp_http_client_route_message(SMPPServer *smpp_server, int direction, Octs
     smpp_http_queued_route->callback = callback;
     smpp_http_queued_route->context = context;
     smpp_http_queued_route->smpp_http_routing = smpp_http_routing;
+    smpp_http_queued_route->smpp_route_status = smpp_route_status_create(msg);
     
     gwlist_produce(smpp_http_routing->queued_requests, smpp_http_queued_route);
     

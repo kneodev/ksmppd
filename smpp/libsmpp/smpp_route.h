@@ -78,6 +78,12 @@ extern "C" {
 #define SMPP_ROUTING_DEFAULT_METHOD SMPP_ROUTING_METHOD_DATABASE
     
     typedef struct {
+        long parts;
+        double cost;
+        int status;
+    } SMPPRouteStatus;
+    
+    typedef struct {
         regex_t *regex;
         Octstr *system_id;
         Octstr *smsc_id;
@@ -95,7 +101,7 @@ extern "C" {
     typedef struct {
         Dict *outbound_routes;
         List *inbound_routes;
-        void (*route_message)(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, int result, double cost), void *context);
+        void (*route_message)(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context);
         void (*reload)(SMPPServer *smpp_server);
         void (*shutdown)(SMPPServer *smpp_server);
         void (*init)(SMPPServer *smpp_server);
@@ -107,15 +113,18 @@ extern "C" {
     } SMPPRouting;
 
     
-    void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, int result, double cost), void *context);
+    void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context);
     
     void smpp_route_init(SMPPServer *smpp_server);
     void smpp_route_shutdown(SMPPServer *smpp_server);
     void smpp_route_rebuild(SMPPServer *smpp_server);
-    void smpp_route_message(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, int result, double cost), void *context);
+    void smpp_route_message(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context);
     
     SMPPRoute *smpp_route_create();
     void smpp_route_destroy(SMPPRoute *smpp_route);
+    
+    SMPPRouteStatus *smpp_route_status_create(Msg *msg);
+    void smpp_route_status_destroy(SMPPRouteStatus *smpp_route_status);
 
 
 

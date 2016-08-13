@@ -64,6 +64,7 @@
 #include "gw/smsc/smpp_pdu.h"
 #include "gw/load.h"
 #include "gw/msg.h"
+#include "gw/sms.h"
 #include "gw/dlr.h"
 #include "smpp_server.h"
 #include "smpp_bearerbox.h"
@@ -77,6 +78,26 @@
 #include "smpp_route.h"
 #include "smpp_http_server.h"
 #include "smpp_http_client.h"
+
+SMPPRouteStatus *smpp_route_status_create(Msg *msg) {
+    SMPPRouteStatus *smpp_route_status = gw_malloc(sizeof(SMPPRouteStatus));
+    
+    if(msg && (msg_type(msg) == sms)) {
+        List *parts = sms_split(msg, NULL, NULL, NULL, NULL, 1, 1, 255, MAX_SMS_OCTETS);
+        smpp_route_status->parts = gwlist_len(parts);
+        gwlist_destroy(parts, (void(*)(void *))msg_destroy);
+    } else {
+        smpp_route_status->parts = 1;
+    }
+    smpp_route_status->status = SMPP_ESME_RINVDSTADR;
+    smpp_route_status->cost = 0;
+    
+    return smpp_route_status;
+}
+
+void smpp_route_status_destroy(SMPPRouteStatus *smpp_route_status) {
+    gw_free(smpp_route_status);
+}
 
 SMPPRoute *smpp_route_create() {
     SMPPRoute *smpp_route = gw_malloc(sizeof(SMPPRoute));
@@ -131,7 +152,7 @@ void smpp_route_rebuild_database(SMPPServer *smpp_server) {
     dict_destroy(old_outbound);
 }
 
-void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, int result, double cost), void *context) {
+void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context) {
     SMPPRouting *smpp_routing = smpp_server->routing;
     List *routes;
     
@@ -139,6 +160,8 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
     
     int found = 0;
     SMPPRoute *route;
+    
+    SMPPRouteStatus *smpp_route_status = smpp_route_status_create(msg);
     
     gw_rwlock_rdlock(smpp_routing->lock);
     if(msg_type(msg) == sms) { /* we can only route sms's */
@@ -163,12 +186,13 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
             }
             
             if(found) {
+                smpp_route_status->status = SMPP_ESME_ROK;
                 octstr_destroy(msg->sms.smsc_id);
                 msg->sms.smsc_id = octstr_duplicate(route->smsc_id);
                 debug("smpp.route.message.database", 0, "SMPP[%s] Found outbound route for %s towards %s", octstr_get_cstr(system_id), octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(msg->sms.smsc_id));
-                callback(context, 1, route->cost);
+                callback(context, smpp_route_status);
             } else {
-                callback(context, 0, 0);
+                callback(context, smpp_route_status);
             }
         } else if((direction == SMPP_ROUTE_DIRECTION_INBOUND) && octstr_len(smsc_id)) {
             routes = smpp_routing->inbound_routes;
@@ -183,24 +207,25 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
             }
             
             if(found) {
+                smpp_route_status->status = SMPP_ESME_ROK;
                 octstr_destroy(msg->sms.service);
                 msg->sms.service = octstr_duplicate(route->system_id);
                 debug("smpp.route.message.database", 0, "SMPP[%s] Found inbound route for %s from %s", octstr_get_cstr(route->system_id), octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(smsc_id));
-                callback(context, 1, route->cost);
+                callback(context, smpp_route_status);
             } else {
-                callback(context, 0, 0);
+                callback(context, smpp_route_status);
             }
         } else {
-            callback(context, 0, 0);
+            callback(context, smpp_route_status);
         }
     } else {
-        callback(context, 0, 0);
+        callback(context, smpp_route_status);
     }
     
     gw_rwlock_unlock(smpp_routing->lock);
 }
 
-void smpp_route_message(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, int result, double cost), void *context) {
+void smpp_route_message(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context) {
     SMPPRouting *smpp_routing = smpp_server->routing;
     if(smpp_routing->route_message) {
         smpp_routing->route_message(smpp_server, direction, smsc_id, system_id, msg, callback, context);

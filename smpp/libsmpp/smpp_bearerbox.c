@@ -214,7 +214,7 @@ void smpp_bearerbox_destroy(SMPPBearerbox *smpp_bearerbox) {
     gw_free(smpp_bearerbox);
 }
 
-void smpp_bearerbox_requeue_routing_done(void *context, int result, double cost) {
+void smpp_bearerbox_requeue_routing_done(void *context, SMPPRouteStatus *smpp_route_status) {
     SMPPDatabaseMsg *smpp_database_msg = context;
     Octstr *ack_id = smpp_uuid_get(smpp_database_msg->msg->sms.id);
     SMPPEsme *smpp_esme;
@@ -222,7 +222,7 @@ void smpp_bearerbox_requeue_routing_done(void *context, int result, double cost)
     SMPPQueuedPDU *smpp_queued_deliver_pdu;
     SMPP_PDU *pdu;
     
-    if(result) {
+    if(smpp_route_status->status == SMPP_ESME_ROK) {
         smpp_esme = smpp_esme_find_best_receiver(smpp_database_msg->smpp_server, smpp_database_msg->msg->sms.service);
         if (smpp_esme) {
             info(0, "SMPP[%s] Successfully routed message for %s", octstr_get_cstr(smpp_esme->system_id), octstr_get_cstr(smpp_database_msg->msg->sms.receiver));
@@ -252,9 +252,10 @@ void smpp_bearerbox_requeue_routing_done(void *context, int result, double cost)
     
     octstr_destroy(ack_id);
     smpp_database_msg_destroy(smpp_database_msg);
+    smpp_route_status_destroy(smpp_route_status);
 }
 
-void smpp_bearerbox_routing_done(void *context, int result, double cost) {
+void smpp_bearerbox_routing_done(void *context, SMPPRouteStatus *smpp_route_status) {
     SMPPBearerboxMsg *smpp_bearerbox_msg = context;
     SMPPBearerbox *smpp_bearerbox = smpp_bearerbox_msg->context;
     Octstr *ack_id = smpp_uuid_get(smpp_bearerbox_msg->msg->sms.id);
@@ -265,7 +266,7 @@ void smpp_bearerbox_routing_done(void *context, int result, double cost) {
     
     
     
-    if(result) {
+    if(smpp_route_status->status == SMPP_ESME_ROK) {
         smpp_esme = smpp_esme_find_best_receiver(smpp_bearerbox->smpp_bearerbox_state->smpp_server, smpp_bearerbox_msg->msg->sms.service);
         if (smpp_esme) {
             info(0, "SMPP[%s] Successfully routed message for %s", octstr_get_cstr(smpp_esme->system_id), octstr_get_cstr(smpp_bearerbox_msg->msg->sms.receiver));
@@ -308,6 +309,7 @@ void smpp_bearerbox_routing_done(void *context, int result, double cost) {
     octstr_destroy(ack_id);
     msg_destroy(smpp_bearerbox_msg->msg);
     smpp_bearerbox_msg_destroy(smpp_bearerbox_msg);
+    smpp_route_status_destroy(smpp_route_status);
 }
 
 int smpp_bearerbox_identify(SMPPBearerbox *smpp_bearerbox) {
