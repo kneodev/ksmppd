@@ -18,7 +18,7 @@ $passwordHeader = 'X-Ksmppd-Password'; /* Actually X-KSMPPD-password */
 
 $users = array(
     'smppuserA:userA' => array(
-        'X-KSMPPD-Auth: 1', 'X-KSMPPD-Throughput: 10', 'X-KSMPPD-Max-Binds: 2'
+        'X-KSMPPD-Auth: 1', 'X-KSMPPD-Throughput: 10', 'X-KSMPPD-Max-Binds: 2', 'X-KSMPPD-Connect-Allow-IP: *.*.*.*'
     ),
     'smppuserB:userB' => array(
         'X-KSMPPD-Auth: 1', 'X-KSMPPD-Throughput: 10', 'X-KSMPPD-Max-Binds: 2'
