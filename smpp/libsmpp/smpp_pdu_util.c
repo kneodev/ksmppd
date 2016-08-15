@@ -702,6 +702,8 @@ Msg *smpp_submit_sm_to_msg(SMPPEsme *smpp_esme, SMPP_PDU *pdu, long *reason)
     smpp_pdu_util_compute_inbound_dcs(msg, smpp_esme->alt_charset, pdu->u.submit_sm.data_coding, pdu->u.submit_sm.esm_class);
 
     msg->sms.pid = pdu->u.submit_sm.protocol_id;
+    
+    msg->sms.time = time(NULL);
 
     /* set priority flag */
     msg->sms.priority = pdu->u.submit_sm.priority_flag;
