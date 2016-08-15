@@ -187,6 +187,7 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
             
             if(found) {
                 smpp_route_status->status = SMPP_ESME_ROK;
+                smpp_route_status->cost = route->cost;
                 octstr_destroy(msg->sms.smsc_id);
                 msg->sms.smsc_id = octstr_duplicate(route->smsc_id);
                 debug("smpp.route.message.database", 0, "SMPP[%s] Found outbound route for %s towards %s", octstr_get_cstr(system_id), octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(msg->sms.smsc_id));
@@ -208,6 +209,7 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
             
             if(found) {
                 smpp_route_status->status = SMPP_ESME_ROK;
+                smpp_route_status->cost = route->cost;
                 octstr_destroy(msg->sms.service);
                 msg->sms.service = octstr_duplicate(route->system_id);
                 debug("smpp.route.message.database", 0, "SMPP[%s] Found inbound route for %s from %s", octstr_get_cstr(route->system_id), octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(smsc_id));
