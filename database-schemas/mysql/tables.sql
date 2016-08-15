@@ -75,6 +75,6 @@ CREATE TABLE `smpp_user` (
   `simulate_temporary_failure_every` int(10) unsigned NOT NULL,
   `simulate_mo_every` int(10) unsigned NOT NULL,
   `max_binds` int(10) unsigned NOT NULL DEFAULT '0',
+  `connect_allow_ip` text,
   PRIMARY KEY (`system_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
+) ENGINE=InnoDB;
