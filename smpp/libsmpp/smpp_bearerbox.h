@@ -96,6 +96,7 @@ extern "C" {
         SMPPBearerboxState *smpp_bearerbox_state;
         RWLock *lock;
         Dict *open_acks;
+        RWLock *ack_lock;
     } SMPPBearerbox;
     
     void smpp_bearerbox_init(SMPPServer *smpp_server);

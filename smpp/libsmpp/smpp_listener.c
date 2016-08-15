@@ -143,6 +143,7 @@ void smpp_listener_event(evutil_socket_t fd, short what, void *arg)
                 error(0, "Could not read PDU from %s status was %d", octstr_get_cstr(smpp_esme->system_id), result);
                 /* This is a connection error we can close this ESME */
                 /* Stop listening on this connection, its dead */
+                smpp_esme_stop_listening(smpp_esme);
                 
                 if(!smpp_esme->authenticated) { /* If there is a pending disconnect operation it means an unbind/rejected bind requested to disconnect, let outbound queue handle */
                     /* This bind is not authenticated so will never be cleaned up, lets do it here  */

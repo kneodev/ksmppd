@@ -76,6 +76,14 @@
 #include "smpp_database.h"
 #include "smpp_route.h"
 
+sig_atomic_t smpp_bearerbox_get_state(SMPPBearerbox *smpp_bearerbox) {
+    sig_atomic_t result;
+    gw_rwlock_rdlock(smpp_bearerbox->lock);
+    result = smpp_bearerbox->alive;
+    gw_rwlock_unlock(smpp_bearerbox->lock);
+    return result;
+}
+
 void smpp_bearerbox_set_state(SMPPBearerbox *smpp_bearerbox, sig_atomic_t state) {
     gw_rwlock_wrlock(smpp_bearerbox->lock);
     smpp_bearerbox->alive = state;
@@ -103,17 +111,25 @@ int smpp_bearerbox_acknowledge(SMPPBearerbox *smpp_bearerbox, Octstr *id, ack_st
     uuid_parse(octstr_get_cstr(id), msg->ack.id);
     msg->ack.nack = status;
     msg->ack.time = time(NULL);
+    int result;
     
-    debug("smpp.bearerbox.acknowledge", 0, "Acknowledging %s to bearerbox", octstr_get_cstr(id));
+    if(smpp_bearerbox_get_state(smpp_bearerbox)) {
+        debug("smpp.bearerbox.acknowledge", 0, "Acknowledging %s to bearerbox", octstr_get_cstr(id));
 
-    int result = deliver_to_bearerbox_real(smpp_bearerbox->connection, msg);
+        result = deliver_to_bearerbox_real(smpp_bearerbox->connection, msg);
 
-    if (result == -1) {
-        smpp_bearerbox_set_state(smpp_bearerbox, 0);
-        msg_destroy(msg);
+        if (result == -1) {
+            smpp_bearerbox_set_state(smpp_bearerbox, 0);
+            msg_destroy(msg);
+        } else {
+            smpp_bearerbox->last_msg = time(NULL);
+        }
     } else {
-        smpp_bearerbox->last_msg = time(NULL);
+        error(0, "Bearerbox %s is offline, cannot send.", octstr_get_cstr(smpp_bearerbox->id));
+        result = -1;
+        msg_destroy(msg);
     }
+    
     return result;
 }
 
@@ -167,6 +183,9 @@ void smpp_bearerbox_add_to_queue(SMPPBearerboxState *smpp_bearerbox_state, SMPPB
             smpp_bearerbox_msg->callback(smpp_bearerbox_msg->context, 0);
         }
         /* Done, either in database or rejected */
+        
+        debug("smpp.bearerbox.add.to.queue", 0, "BB[(null)] Destroying %s", octstr_get_cstr(smpp_bearerbox_msg->id));
+        
         msg_destroy(smpp_bearerbox_msg->msg); /* Destroy this now, it will be reloaded from the database */
         smpp_bearerbox_msg_destroy(smpp_bearerbox_msg);
     }
@@ -197,6 +216,7 @@ SMPPBearerbox *smpp_bearerbox_create() {
     smpp_bearerbox->port = 0l;
     smpp_bearerbox->smpp_bearerbox_state = NULL;
     smpp_bearerbox->lock = gw_rwlock_create();
+    smpp_bearerbox->ack_lock = gw_rwlock_create();
     smpp_bearerbox->ssl = 0;
     smpp_bearerbox->writer_alive = 0;
     smpp_bearerbox->open_acks = NULL;
@@ -209,6 +229,7 @@ void smpp_bearerbox_destroy(SMPPBearerbox *smpp_bearerbox) {
     octstr_destroy(smpp_bearerbox->id);
     conn_destroy(smpp_bearerbox->connection);
     gw_rwlock_destroy(smpp_bearerbox->lock);
+    gw_rwlock_destroy(smpp_bearerbox->ack_lock);
     dict_destroy(smpp_bearerbox->open_acks);
 
     gw_free(smpp_bearerbox);
@@ -353,6 +374,7 @@ void smpp_bearerbox_outbound_thread(void *arg) {
             if ((smpp_bearerbox->alive) && (smpp_bearerbox->connection != NULL)) {
                 if(msg_type(smpp_bearerbox_msg->msg) == sms) {
                     /* Only SMS messages get acks */
+                    debug("smpp.bearerbox.outbound.thread", 0, "BB[%s] Adding %s to open acks", octstr_get_cstr(smpp_bearerbox->id), octstr_get_cstr(smpp_bearerbox_msg->id));
                     dict_put(smpp_bearerbox->open_acks, smpp_bearerbox_msg->id, smpp_bearerbox_msg);
                     if(smpp_bearerbox_msg->msg->sms.boxc_id) {
                         octstr_destroy(smpp_bearerbox_msg->msg->sms.boxc_id);
@@ -361,6 +383,7 @@ void smpp_bearerbox_outbound_thread(void *arg) {
                 }
                 result = deliver_to_bearerbox_real(smpp_bearerbox->connection, smpp_bearerbox_msg->msg);
                 if (result == -1) {
+                    dict_remove(smpp_bearerbox->open_acks, smpp_bearerbox_msg->id); /* We don't want this being cleaned up as it will be requeued */
                     error(0, "Error writing message to bearerbox, disconnecting");
                     smpp_bearerbox->alive = 0;
                     requeue = 1;
@@ -413,8 +436,10 @@ void smpp_bearerbox_inbound_thread(void *arg) {
             
             if(smpp_bearerbox->open_acks) {
                /* This box has some pending acks, lets notify the binds they failed (temporary) */
+               gw_rwlock_wrlock(smpp_bearerbox->ack_lock);
                keys = dict_keys(smpp_bearerbox->open_acks); 
                while((ack_id = gwlist_consume(keys)) != NULL) {
+                   debug("smpp.bearerbox.inbound.thread", 0, "BB[%s] Ack cleanup removing %s", octstr_get_cstr(smpp_bearerbox->id), octstr_get_cstr(ack_id));
                    smpp_bearerbox_msg = dict_remove(smpp_bearerbox->open_acks, ack_id);
                    if(smpp_bearerbox_msg) {
                        smpp_bearerbox_msg->callback(smpp_bearerbox_msg->context, SMPP_ESME_RSYSERR);
@@ -423,6 +448,7 @@ void smpp_bearerbox_inbound_thread(void *arg) {
                    octstr_destroy(ack_id);
                }
                gwlist_destroy(keys, NULL);
+               gw_rwlock_unlock(smpp_bearerbox->ack_lock);
             }
 
             dict_destroy(smpp_bearerbox->open_acks);
@@ -459,9 +485,11 @@ void smpp_bearerbox_inbound_thread(void *arg) {
 
                     ack_id = smpp_uuid_get(msg->ack.id);
 
-                    debug("smpp.bearerbox.inbound.thread", 0, "Message type ack %s", octstr_get_cstr(ack_id));
+                    debug("smpp.bearerbox.inbound.thread", 0, "BB[%s] Message type ack %s", octstr_get_cstr(smpp_bearerbox->id), octstr_get_cstr(ack_id));
 
+                    gw_rwlock_wrlock(smpp_bearerbox->ack_lock);
                     smpp_bearerbox_msg = dict_remove(smpp_bearerbox->open_acks, ack_id);
+                    gw_rwlock_unlock(smpp_bearerbox->ack_lock);
 
                     if (smpp_bearerbox_msg != NULL) {
                         switch (msg->ack.nack) {

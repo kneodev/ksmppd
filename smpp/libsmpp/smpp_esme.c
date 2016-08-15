@@ -300,6 +300,7 @@ List *smpp_esme_global_get_queued(SMPPServer *smpp_server) {
                         gwlist_produce(queues, smpp_queued_pdu);
                     }
                     gwlist_destroy(pdus, NULL);
+                    smpp_database_msg_destroy(smpp_database_msg);
                 }
                 gwlist_destroy(msg_queue, NULL);
             }
@@ -489,8 +490,9 @@ void smpp_esme_cleanup_thread(void *arg) {
                 alive = 1;
                 smpp_esme = gwlist_get(smpp_esme_global->binds, j);
 
-                info(0, " -- %s (%d)-- openacks:%lu inbound:%f,outbound:%f,inbound-queue:%lu,outbound-queue:%lu,inbound-processed:%lu,outbound-processed:%lu",
+                info(0, " -- %s:%ld (%d)-- openacks:%lu inbound:%f,outbound:%f,inbound-queue:%lu,outbound-queue:%lu,inbound-processed:%lu,outbound-processed:%lu",
                         octstr_get_cstr(smpp_esme->system_id),
+                        smpp_esme->id,
                         smpp_esme->bind_type,
                         dict_key_count(smpp_esme->open_acks),
                         load_get(smpp_esme->inbound_load, 0),
@@ -868,6 +870,13 @@ void smpp_esme_destroy_open_acks(SMPPEsme *smpp_esme) {
     while((key = gwlist_consume(keys)) != NULL) {
         smpp_queued_pdu = dict_remove(smpp_esme->open_acks, key);
         if((smpp_queued_pdu) && (smpp_queued_pdu->callback)) {
+            debug("smpp.esme.destroy.open.acks", 0, "Destroying open ack "
+                    " key: %s, "
+                    " system_id: %s, "
+                    " bearerbox_id: %s, "
+                    " sequence: %ld, "
+                    " disconnect: %d, "
+                    " pdu_type: %s", octstr_get_cstr(key), octstr_get_cstr(smpp_queued_pdu->system_id), octstr_get_cstr(smpp_queued_pdu->bearerbox_id), smpp_queued_pdu->sequence, smpp_queued_pdu->disconnect, smpp_queued_pdu->pdu->type_name);
             smpp_queued_pdu->callback(smpp_queued_pdu, SMPP_QUEUED_PDU_DESTROYED);
         }
         octstr_destroy(key);
@@ -930,6 +939,8 @@ SMPPEsme *smpp_esme_create() {
 
 void smpp_esme_destroy(SMPPEsme *smpp_esme) {
     debug("smpp.esme.destroy", 0, "Destroying ESME id:%ld - %s", smpp_esme->id, octstr_get_cstr(smpp_esme->system_id));
+    smpp_esme_destroy_open_acks(smpp_esme);
+    
     counter_destroy(smpp_esme->inbound_queued);
     counter_destroy(smpp_esme->outbound_queued);
     counter_destroy(smpp_esme->errors);
@@ -950,8 +961,6 @@ void smpp_esme_destroy(SMPPEsme *smpp_esme) {
 
     counter_destroy(smpp_esme->catenated_sms_counter);
     counter_destroy(smpp_esme->sequence_number);
-    
-    smpp_esme_destroy_open_acks(smpp_esme);
     
     gw_rwlock_destroy(smpp_esme->event_lock);
     gw_rwlock_destroy(smpp_esme->ack_process_lock);
