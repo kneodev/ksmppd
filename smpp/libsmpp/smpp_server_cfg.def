@@ -87,6 +87,7 @@ SINGLE_GROUP(ksmppd,
     OCTSTR(database-enable-queue)
     OCTSTR(database-pdu-table)
     OCTSTR(database-route-table)
+    OCTSTR(database-version-table)
   
         
     OCTSTR(inbound-queue-threads)

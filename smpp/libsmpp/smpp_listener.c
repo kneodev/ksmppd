@@ -178,8 +178,17 @@ static void smpp_listener_connection_callback(struct evconnlistener *listener, e
     struct event_base *base = evconnlistener_get_base(listener);
     
     SMPPServer *smpp_server = ctx;
+    Octstr *ip = NULL; //host_ip(address);
     
-    debug("smpp.listener.connection.callback", 0, "Got connection");
+    if (address->sa_family == AF_INET)
+    {
+        struct sockaddr_in *sin = (struct sockaddr_in *) address;
+        ip = host_ip(*sin);
+    }
+    
+    
+    
+    debug("smpp.listener.connection.callback", 0, "Got connection from %s", octstr_get_cstr(ip));
     
     struct event *event_container;
     
@@ -189,6 +198,7 @@ static void smpp_listener_connection_callback(struct evconnlistener *listener, e
     smpp_esme->smpp_server = smpp_server;
     smpp_esme->time_connected = time(NULL);
     smpp_esme->id = counter_value(smpp_server->esme_counter);
+    smpp_esme->ip = ip;
     counter_increase(smpp_server->esme_counter);
     
     event_container = event_new(base, fd, EV_TIMEOUT|EV_READ|EV_PERSIST, smpp_listener_event,

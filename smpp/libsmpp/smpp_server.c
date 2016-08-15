@@ -88,6 +88,7 @@ SMPPServer *smpp_server_create() {
     smpp_server->database_route_table = NULL;
     smpp_server->database_store_table = NULL;
     smpp_server->database_user_table = NULL;
+    smpp_server->database_version_table = NULL;
     
     smpp_server->running_configuration = NULL;
     smpp_server->inbound_queue = NULL;
@@ -115,6 +116,7 @@ void smpp_server_destroy(SMPPServer *smpp_server) {
     octstr_destroy(smpp_server->database_route_table);
     octstr_destroy(smpp_server->database_store_table);
     octstr_destroy(smpp_server->database_user_table);
+    octstr_destroy(smpp_server->database_version_table);
     octstr_destroy(smpp_server->config_filename);
     counter_destroy(smpp_server->esme_counter);
     counter_destroy(smpp_server->running_threads);
@@ -193,6 +195,7 @@ int smpp_server_reconfigure(SMPPServer *smpp_server) {
                 smpp_server->database_user_table = cfg_get(grp, octstr_imm("database-user-table"));
                 smpp_server->database_pdu_table = cfg_get(grp, octstr_imm("database-pdu-table"));
                 smpp_server->database_route_table = cfg_get(grp, octstr_imm("database-route-table"));
+                smpp_server->database_version_table = cfg_get(grp, octstr_imm("database-version-table"));
                 
                 if(!octstr_len(smpp_server->database_type)) {
                     panic(0, "The SMPP server cannot function without a 'database-type' parameter");

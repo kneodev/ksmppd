@@ -271,6 +271,7 @@ void smpp_route_init(SMPPServer *smpp_server) {
     smpp_routing->outbound_routes = NULL;
     smpp_routing->reload = NULL;
     smpp_routing->route_message = NULL;
+    smpp_routing->init = NULL;
     smpp_routing->outbound_lock = gw_rwlock_create();
     smpp_routing->initialized = 0;
     

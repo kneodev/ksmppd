@@ -426,7 +426,7 @@ void smpp_queues_handle_bind_pdu(SMPPQueuedPDU *smpp_queued_pdu) {
     SMPPQueuedPDU *smpp_queued_response_pdu = NULL;
     switch (smpp_queued_pdu->pdu->type) {
         case bind_transmitter:
-            auth_result = smpp_esme_auth(smpp_queued_pdu->smpp_esme->smpp_server, smpp_queued_pdu->pdu->u.bind_transmitter.system_id, smpp_queued_pdu->pdu->u.bind_transmitter.password);
+            auth_result = smpp_esme_auth(smpp_queued_pdu->smpp_esme->smpp_server, smpp_queued_pdu->pdu->u.bind_transmitter.system_id, smpp_queued_pdu->pdu->u.bind_transmitter.password, smpp_queued_pdu->smpp_esme);
             smpp_queued_response_pdu = smpp_queued_pdu_create();
             smpp_queued_response_pdu->smpp_esme = smpp_queued_pdu->smpp_esme;
             smpp_queued_response_pdu->pdu = smpp_pdu_create(bind_transmitter_resp, smpp_queued_pdu->pdu->u.bind_transmitter.sequence_number);
@@ -446,7 +446,7 @@ void smpp_queues_handle_bind_pdu(SMPPQueuedPDU *smpp_queued_pdu) {
             smpp_queues_add_outbound(smpp_queued_response_pdu);
             break;
         case bind_transceiver:
-            auth_result = smpp_esme_auth(smpp_queued_pdu->smpp_esme->smpp_server, smpp_queued_pdu->pdu->u.bind_transceiver.system_id, smpp_queued_pdu->pdu->u.bind_transceiver.password);
+            auth_result = smpp_esme_auth(smpp_queued_pdu->smpp_esme->smpp_server, smpp_queued_pdu->pdu->u.bind_transceiver.system_id, smpp_queued_pdu->pdu->u.bind_transceiver.password, smpp_queued_pdu->smpp_esme);
             smpp_queued_response_pdu = smpp_queued_pdu_create();
             smpp_queued_response_pdu->smpp_esme = smpp_queued_pdu->smpp_esme;
             smpp_queued_response_pdu->pdu = smpp_pdu_create(bind_transceiver_resp, smpp_queued_pdu->pdu->u.bind_transceiver.sequence_number);
@@ -466,7 +466,7 @@ void smpp_queues_handle_bind_pdu(SMPPQueuedPDU *smpp_queued_pdu) {
             smpp_queues_add_outbound(smpp_queued_response_pdu);
             break;
         case bind_receiver:
-            auth_result = smpp_esme_auth(smpp_queued_pdu->smpp_esme->smpp_server, smpp_queued_pdu->pdu->u.bind_receiver.system_id, smpp_queued_pdu->pdu->u.bind_receiver.password);
+            auth_result = smpp_esme_auth(smpp_queued_pdu->smpp_esme->smpp_server, smpp_queued_pdu->pdu->u.bind_receiver.system_id, smpp_queued_pdu->pdu->u.bind_receiver.password, smpp_queued_pdu->smpp_esme);
             smpp_queued_response_pdu = smpp_queued_pdu_create();
             smpp_queued_response_pdu->smpp_esme = smpp_queued_pdu->smpp_esme;
             smpp_queued_response_pdu->pdu = smpp_pdu_create(bind_receiver_resp, smpp_queued_pdu->pdu->u.bind_receiver.sequence_number);

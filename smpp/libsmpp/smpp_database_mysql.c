@@ -414,8 +414,14 @@ int smpp_database_mysql_init_tables(SMPPServer *smpp_server, SMPPDatabase *smpp_
     Msg *msg = msg_create(sms);
 
     int res = 0;
+    
+    long running_version = 1;
+    long our_version = 0;
 
     DBPoolConn *conn;
+    
+    List *binds = NULL;
+    List *rows = NULL;
 
     char id[UUID_STR_LEN + 1];
 
@@ -486,11 +492,61 @@ int smpp_database_mysql_init_tables(SMPPServer *smpp_server, SMPPDatabase *smpp_
         res = 1;
     }
     
-
-    dbpool_conn_produce(conn);
-    
     octstr_destroy(sql);
     msg_destroy(msg);
+    
+
+    sql = octstr_format("CREATE TABLE IF NOT EXISTS %S ( "
+            "`component` varchar(54) not null, "
+            "`version` int unsigned not null,"
+            " PRIMARY KEY(`component`)"
+            ");", smpp_server->database_version_table);
+    
+    
+    if((res = dbpool_conn_update(conn, sql, NULL)) == -1) {
+        error(0, "Query error '%s'", octstr_get_cstr(sql));
+    } else {
+        octstr_destroy(sql);
+        sql = octstr_format("SELECT `version` FROM %S WHERE `component` = ?", smpp_server->database_version_table);
+        binds = gwlist_create();
+        gwlist_produce(binds, octstr_create("ksmppd"));
+        
+        if((res = dbpool_conn_select(conn, sql, binds, &rows)) == 0) {
+            if(gwlist_len(rows) > 0) {
+                running_version = atol(octstr_get_cstr(gwlist_get(gwlist_get(rows, 0), 0)));
+                gwlist_destroy(gwlist_get(rows, 0), (void(*)(void *))octstr_destroy);
+            } else {
+                octstr_destroy(sql);
+                sql = octstr_format("INSERT INTO %S (`component`, `version`) VALUES (?, %ld);", smpp_server->database_version_table, running_version);
+                dbpool_conn_update(conn, sql, binds);
+            }
+            gwlist_destroy(rows, NULL);
+        }
+        
+        debug("smpp.database.mysql.init.tables", 0, "Running database schema version %ld ", running_version);
+        
+        our_version = 2;
+        if(running_version < our_version) {
+            octstr_destroy(sql);
+            sql = octstr_format("ALTER TABLE %S ADD COLUMN connect_allow_ip text", smpp_server->database_user_table);
+            dbpool_conn_update(conn, sql, NULL);
+            running_version = our_version;
+        }
+        
+        octstr_destroy(sql);
+        sql = octstr_format("UPDATE %S SET `version` = %ld WHERE `component` = ?", smpp_server->database_version_table, running_version);
+        dbpool_conn_update(conn, sql, binds);
+
+        gwlist_destroy(binds, (void(*)(void *))octstr_destroy);
+    }
+    
+    
+    octstr_destroy(sql);
+    dbpool_conn_produce(conn);
+    
+    
+    
+    
 
     return res;   
     
@@ -738,7 +794,8 @@ SMPPESMEAuthResult *smpp_database_mysql_authenticate(void *context, Octstr *user
             "`simulate_mo_every`, "
             "`default_cost`, "
             "`max_binds`, "
-            "`enable_prepaid_billing` "
+            "`enable_prepaid_billing`, "
+            "`connect_allow_ip` "
             " FROM %S WHERE `system_id` = ? AND `password` = PASSWORD(?) LIMIT 1", smpp_server->database_user_table);
 
     gwlist_append(binds, username);
@@ -765,6 +822,9 @@ SMPPESMEAuthResult *smpp_database_mysql_authenticate(void *context, Octstr *user
         res->default_cost = atof(octstr_get_cstr(gwlist_get(row, 8)));
         res->max_binds = atoi(octstr_get_cstr(gwlist_get(row, 9)));
         res->enable_prepaid_billing = atoi(octstr_get_cstr(gwlist_get(row, 10)));
+        if(octstr_len(gwlist_get(row, 11))) {
+            res->allowed_ips = octstr_duplicate(gwlist_get(row, 11));
+        }
         
         tmp = gwlist_get(row, 3);
         if(tmp != NULL) {
@@ -915,6 +975,12 @@ found:
         warning(0, "No 'database-route-table' specified, using default 'smpp_route'");
         octstr_destroy(smpp_server->database_route_table);
         smpp_server->database_route_table = octstr_create("smpp_route");
+    }
+    
+    if(!octstr_len(smpp_server->database_version_table)) {
+        warning(0, "No 'database-version-table' specified, using default 'smpp_version'");
+        octstr_destroy(smpp_server->database_version_table);
+        smpp_server->database_version_table = octstr_create("smpp_version");
     }
     
     smpp_database_mysql_init_tables(smpp_server, smpp_database);

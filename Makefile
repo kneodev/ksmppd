@@ -58,10 +58,13 @@ smpp: $(smpp)
 $(testprogs): $(testobjs) $(libs)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(@:=).o $(libs) $(LIBS)
 	
-$(smpp): $(smppobjs) $(libs)
+$(smpp): FORCE $(smppobjs) $(libs)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(@:=).o $(libs) $(LIBS)
 	
 
 
 clean:
-	rm ${testprogs} tests/*.o smpp/libsmpp/*.o smpp/*.o ${smpp} libsmpp.a 
+	rm -f ${testprogs} tests/*.o smpp/libsmpp/*.o smpp/*.o ${smpp} libsmpp.a 
+
+FORCE:
+	rm -f smpp/libsmpp/*.o libsmpp.a ${smpp}

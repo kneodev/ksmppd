@@ -103,6 +103,7 @@ SMPPESMEAuthResult *smpp_esme_auth_result_create() {
     smpp_esme_auth_result->default_cost = 0;
     smpp_esme_auth_result->max_binds = 0;
     smpp_esme_auth_result->enable_prepaid_billing = 0;
+    smpp_esme_auth_result->allowed_ips = NULL;
     
     
     return smpp_esme_auth_result;
@@ -114,6 +115,7 @@ void smpp_esme_auth_result_destroy(SMPPESMEAuthResult *smpp_esme_auth_result) {
     }
     octstr_destroy(smpp_esme_auth_result->default_smsc);
     octstr_destroy(smpp_esme_auth_result->callback_url);
+    octstr_destroy(smpp_esme_auth_result->allowed_ips);
     gw_free(smpp_esme_auth_result);
 }
 
@@ -336,7 +338,7 @@ void smpp_esme_global_add(SMPPServer *smpp_server, SMPPEsme *smpp_esme) {
     gw_rwlock_unlock(smpp_esme_data->lock);
 }
 
-SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, Octstr *password) {
+SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, Octstr *password, SMPPEsme *smpp_esme) {
     SMPPESMEAuthResult *smpp_auth_result = NULL;
     SMPPEsmeData *smpp_esme_data = smpp_server->esme_data;
     Octstr *tmp_system_id;
@@ -352,6 +354,16 @@ SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, O
     }
     
     if(smpp_auth_result) {
+        if(octstr_len(smpp_auth_result->allowed_ips)) {
+            if(connect_denied(smpp_auth_result->allowed_ips, smpp_esme->ip)) {
+                error(0, "SMPP[%s] denying bind due to non-allowed IP (%s vs %s)", octstr_get_cstr(system_id), octstr_get_cstr(smpp_auth_result->allowed_ips), octstr_get_cstr(smpp_esme->ip));
+                smpp_esme_auth_result_destroy(smpp_auth_result);
+                smpp_auth_result = NULL;
+            }
+        }
+    }
+    
+    if(smpp_auth_result) {   
         gw_rwlock_wrlock(smpp_esme_data->lock);
         /* Successful authentication, lets check max binds */
         if(smpp_auth_result->max_binds > 0) {
@@ -911,6 +923,7 @@ SMPPEsme *smpp_esme_create() {
     smpp_esme->max_open_acks = SMPP_ESME_DEFAULT_MAX_OPEN_ACKS;
     smpp_esme->ack_process_lock = gw_rwlock_create();
     smpp_esme->pending_routing = counter_create();
+    smpp_esme->ip = NULL;
 
     return smpp_esme;
 }
@@ -930,6 +943,8 @@ void smpp_esme_destroy(SMPPEsme *smpp_esme) {
     octstr_destroy(smpp_esme->system_type);
     load_destroy(smpp_esme->inbound_load);
     load_destroy(smpp_esme->outbound_load);
+    
+    octstr_destroy(smpp_esme->ip);
 
     smpp_esme_disconnect(smpp_esme);
 

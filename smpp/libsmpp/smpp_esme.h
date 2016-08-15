@@ -114,6 +114,8 @@ extern "C" {
         unsigned long simulate_temporary_failure_every;
         
         int enable_prepaid_billing;
+        
+        Octstr *allowed_ips;
     } SMPPESMEAuthResult;
     
     typedef struct {
@@ -176,6 +178,8 @@ extern "C" {
         long max_open_acks;
         
         SMPPEsmeGlobal *smpp_esme_global;
+        
+        Octstr *ip;
     } SMPPEsme;
     
     SMPPESMEAuthResult *smpp_esme_auth_result_create();
@@ -204,7 +208,7 @@ extern "C" {
     List *smpp_esme_global_get_readers(SMPPServer *smpp_server, int best_only);
     List *smpp_esme_global_get_queued(SMPPServer *smpp_server);
     
-    SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, Octstr *password);
+    SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, Octstr *password, SMPPEsme *smpp_esme);
 
 #ifdef __cplusplus
 }

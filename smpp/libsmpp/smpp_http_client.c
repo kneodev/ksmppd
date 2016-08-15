@@ -187,6 +187,12 @@ SMPPESMEAuthResult *smpp_http_client_auth(SMPPServer *smpp_server, Octstr *syste
                         res->callback_url = octstr_duplicate(tmp);
                     }
                     octstr_destroy(tmp);
+                    
+                    tmp = http_header_value(response_headers, octstr_imm("x-ksmppd-connect-allow-ip"));
+                    if(octstr_len(tmp)) {
+                        res->allowed_ips = octstr_duplicate(tmp);
+                    }
+                    octstr_destroy(tmp);
                 }
             }
             octstr_destroy(auth);
