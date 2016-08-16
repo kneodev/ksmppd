@@ -182,6 +182,20 @@ void smpp_queues_callback_submit_sm(void *context, int status) {
     }
 }
 
+void smpp_queues_callback_data_sm(void *context, int status) {
+    SMPPQueuedPDU *smpp_queued_response_pdu = context;
+
+    if (status != SMPP_ESME_ROK) {
+        octstr_destroy(smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id);
+        smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id = NULL;
+        smpp_queued_response_pdu->pdu->u.data_sm_resp.command_status = status;
+        smpp_queues_add_outbound(smpp_queued_response_pdu);
+    } else {
+        smpp_queued_response_pdu->pdu->u.data_sm_resp.command_status = status;
+        smpp_queues_add_outbound(smpp_queued_response_pdu);
+    }
+}
+
 void smpp_queues_msg_set_dlr_url(SMPPEsme *smpp_esme, Msg *msg) {
     octstr_destroy(msg->sms.dlr_url);
     msg->sms.dlr_url = octstr_duplicate(smpp_esme->system_id);
@@ -235,6 +249,52 @@ void smpp_queues_submit_routing_done(void *context, SMPPRouteStatus *smpp_route_
     }
     smpp_route_status_destroy(smpp_route_status);
 }
+
+void smpp_queues_data_sm_routing_done(void *context, SMPPRouteStatus *smpp_route_status) {
+    SMPPQueuedPDU *smpp_queued_response_pdu = context;
+    counter_decrease(smpp_queued_response_pdu->smpp_esme->pending_routing);
+    double cost = smpp_route_status->parts * smpp_route_status->cost;
+    if(smpp_route_status->status == SMPP_ESME_ROK) {
+        if(!smpp_queued_response_pdu->smpp_esme->smpp_esme_global->enable_prepaid_billing || smpp_database_deduct_credit(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->smpp_esme->system_id, cost)) {
+            info(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);
+            smpp_bearerbox_add_message(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->msg, smpp_queues_callback_data_sm, smpp_queued_response_pdu);
+        } else {
+            warning(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f, but not enough credit", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);
+            octstr_destroy(smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id);
+            smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id = NULL;
+            smpp_queued_response_pdu->pdu->u.data_sm_resp.command_status = SMPP_ESME_RSUBMITFAIL;
+            msg_destroy(smpp_queued_response_pdu->msg);
+            smpp_queued_response_pdu->msg = NULL;
+            smpp_queues_add_outbound(smpp_queued_response_pdu);
+        }
+    } else {
+        if(octstr_len(smpp_queued_response_pdu->msg->sms.smsc_id)) {
+            cost = smpp_route_status->parts * smpp_queued_response_pdu->smpp_esme->default_cost;
+            if(!smpp_queued_response_pdu->smpp_esme->smpp_esme_global->enable_prepaid_billing || smpp_database_deduct_credit(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->smpp_esme->system_id, cost)) {
+                info(0, "SMPP[%s] Using default routing for %s to %s for cost %f", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), smpp_queued_response_pdu->smpp_esme->default_cost);
+                smpp_bearerbox_add_message(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->msg, smpp_queues_callback_data_sm, smpp_queued_response_pdu);
+            } else {
+                warning(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f, but not enough credit", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);
+                octstr_destroy(smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id);
+                smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id = NULL;
+                smpp_queued_response_pdu->pdu->u.data_sm_resp.command_status = SMPP_ESME_RSUBMITFAIL;
+                msg_destroy(smpp_queued_response_pdu->msg);
+                smpp_queued_response_pdu->msg = NULL;
+                smpp_queues_add_outbound(smpp_queued_response_pdu);
+            }
+        } else {
+            warning(0, "SMPP[%s] could not route message to %s, rejecting", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver));
+            octstr_destroy(smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id);
+            smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id = NULL;
+            smpp_queued_response_pdu->pdu->u.data_sm_resp.command_status = smpp_route_status->status;
+            msg_destroy(smpp_queued_response_pdu->msg);
+            smpp_queued_response_pdu->msg = NULL;
+            smpp_queues_add_outbound(smpp_queued_response_pdu);
+        }
+    }
+    smpp_route_status_destroy(smpp_route_status);
+}
+
 
 void smpp_queues_handle_submit_sm(SMPPQueuedPDU *smpp_queued_pdu) {
     SMPPEsme *smpp_esme = smpp_queued_pdu->smpp_esme;
@@ -383,6 +443,64 @@ void smpp_queues_handle_submit_sm(SMPPQueuedPDU *smpp_queued_pdu) {
         
         smpp_queued_pdu_destroy(smpp_queued_pdu);
     }
+}
+void smpp_queues_handle_data_sm(SMPPQueuedPDU *smpp_queued_pdu) {
+    SMPPEsme *smpp_esme = smpp_queued_pdu->smpp_esme;
+    SMPPQueuedPDU *smpp_queued_response_pdu = NULL;
+
+    if (!(smpp_esme->bind_type & SMPP_ESME_TRANSMIT)) {
+        smpp_queued_response_pdu = smpp_queued_pdu_create_quick(smpp_esme, data_sm_resp, smpp_queued_pdu->pdu->u.data_sm.sequence_number);
+        smpp_queued_response_pdu->pdu->u.data_sm_resp.command_status = SMPP_ESME_RINVBNDSTS;
+        smpp_queues_add_outbound(smpp_queued_response_pdu);
+        smpp_queued_pdu_destroy(smpp_queued_pdu);
+        return;
+    }
+
+    double current_load = load_get(smpp_esme->smpp_esme_global->inbound_load, 1);
+
+    if (smpp_esme->smpp_esme_global->throughput > 0 && (current_load > smpp_esme->smpp_esme_global->throughput)) {
+        error(0, "SMPP[%s] Exceeded throughput %f, %f, throttling.", octstr_get_cstr(smpp_esme->system_id), current_load, smpp_esme->smpp_esme_global->throughput);
+        smpp_queued_response_pdu = smpp_queued_pdu_create_quick(smpp_esme, data_sm_resp, smpp_queued_pdu->pdu->u.data_sm.sequence_number);
+        smpp_queued_response_pdu->pdu->u.data_sm_resp.command_status = SMPP_ESME_RTHROTTLED;
+        smpp_queues_add_outbound(smpp_queued_response_pdu);
+        smpp_queued_pdu_destroy(smpp_queued_pdu);
+        return;
+    } else {
+        debug("smpp.queues.handle.data_sm", 0, "Current load is ok %f", current_load);
+    }
+
+
+    smpp_esme_inbound_load_increase(smpp_queued_pdu->smpp_esme);
+
+    long error_reason;
+    Msg *msg;
+    
+    /* Deliver to bearerbox */
+    msg = smpp_data_sm_to_msg(smpp_queued_pdu->smpp_esme, smpp_queued_pdu->pdu, &error_reason);
+
+
+    if (msg == NULL) {
+        smpp_queued_response_pdu = smpp_queued_pdu_create_quick(smpp_esme, data_sm_resp, smpp_queued_pdu->pdu->u.data_sm.sequence_number);
+        error(0, "SMPP[%s] Couldn't generate message from PDU, rejecting %ld", octstr_get_cstr(smpp_queued_pdu->smpp_esme->system_id), error_reason);
+        smpp_queued_response_pdu->pdu->u.data_sm_resp.command_status = error_reason;
+        smpp_queues_add_outbound(smpp_queued_response_pdu);
+    } else {
+        if (octstr_len(smpp_esme->default_smsc)) {
+            octstr_destroy(msg->sms.smsc_id);
+            msg->sms.smsc_id = octstr_duplicate(smpp_esme->default_smsc);
+        }
+
+        smpp_queues_msg_set_dlr_url(smpp_esme, msg);
+
+        smpp_queued_response_pdu = smpp_queued_pdu_create_quick(smpp_esme, data_sm_resp, smpp_queued_pdu->pdu->u.data_sm.sequence_number);
+        smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id = smpp_uuid_get(msg->sms.id);
+        smpp_queued_response_pdu->msg = msg;
+
+        counter_increase(smpp_esme->pending_routing);
+        smpp_route_message(smpp_esme->smpp_server, SMPP_ROUTE_DIRECTION_OUTBOUND, NULL, smpp_esme->system_id, msg, smpp_queues_data_sm_routing_done, smpp_queued_response_pdu);
+    }
+
+    smpp_queued_pdu_destroy(smpp_queued_pdu);
 }
 
 void smpp_queues_send_enquire_link(SMPPEsme *smpp_esme) {
@@ -560,6 +678,9 @@ void smpp_queues_inbound_thread(void *arg) {
                 break;
             case submit_sm:
                 smpp_queues_handle_submit_sm(smpp_queued_pdu);
+                break;
+            case data_sm:
+                smpp_queues_handle_data_sm(smpp_queued_pdu);
                 break;
             case deliver_sm_resp:
                 smpp_queues_process_ack(smpp_queued_pdu->smpp_esme, smpp_queued_pdu->pdu->u.deliver_sm_resp.sequence_number, smpp_queued_pdu->pdu->u.deliver_sm_resp.command_status);

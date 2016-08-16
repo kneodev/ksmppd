@@ -731,3 +731,142 @@ error:
     msg_destroy(msg);
     return NULL;
 }
+
+
+Msg *smpp_data_sm_to_msg(SMPPEsme *smpp_esme, SMPP_PDU *pdu, long *reason)
+{
+    Msg *msg;
+    int ton, npi;
+
+    gw_assert(pdu->type == data_sm);
+
+    msg = msg_create(sms);
+    msg->sms.sms_type = mt_push;
+    msg->sms.service = octstr_duplicate(smpp_esme->system_id);
+    
+    *reason = SMPP_ESME_ROK;
+
+    /*
+     * Reset source addr to have a prefixed '+' in case we have an
+     * intl. TON to allow backend boxes (ie. smsbox) to distinguish
+     * between national and international numbers.
+     */
+    ton = pdu->u.data_sm.source_addr_ton;
+    npi = pdu->u.data_sm.source_addr_npi;
+    /* check source addr */
+    if ((*reason = smpp_pdu_util_convert_addr(smpp_esme->system_id, pdu->u.data_sm.source_addr, ton, npi, smpp_esme->alt_addr_charset)) != SMPP_ESME_ROK)
+        goto error;
+    msg->sms.sender = pdu->u.data_sm.source_addr;
+    pdu->u.data_sm.source_addr = NULL;
+
+    /*
+     * Follows SMPP spec. v3.4. issue 1.2
+     * it's not allowed to have destination_addr NULL
+     */
+    if (pdu->u.data_sm.destination_addr == NULL) {
+        error(0, "SMPP[%s]: Malformed destination_addr `%s', may not be empty. "
+              "Discarding MO message.", octstr_get_cstr(smpp_esme->system_id),
+              octstr_get_cstr(pdu->u.data_sm.destination_addr));
+        *reason = SMPP_ESME_RINVDSTADR;
+        goto error;
+    }
+
+    /* Same reset of destination number as for source */
+    ton = pdu->u.data_sm.dest_addr_ton;
+    npi = pdu->u.data_sm.dest_addr_npi;
+    /* check destination addr */
+    if ((*reason = smpp_pdu_util_convert_addr(smpp_esme->system_id, pdu->u.data_sm.destination_addr, ton, npi, smpp_esme->alt_addr_charset)) != SMPP_ESME_ROK)
+        goto error;
+    msg->sms.receiver = pdu->u.data_sm.destination_addr;
+    pdu->u.data_sm.destination_addr = NULL;
+
+    /* SMSCs use service_type for billing information
+     * According to SMPP v5.0 there is no 'billing_identification'
+     * TLV in the data_sm PDU optional TLVs. */
+    msg->sms.binfo = pdu->u.data_sm.service_type;
+    pdu->u.data_sm.service_type = NULL;
+
+    if (pdu->u.data_sm.esm_class & ESM_CLASS_SUBMIT_RPI)
+        msg->sms.rpi = 1;
+
+    /*
+     * Check for message_payload if version > 0x33 and sm_length == 0
+     * Note: SMPP spec. v3.4. doesn't allow to send both: message_payload & short_message!
+     */
+    msg->sms.msgdata = pdu->u.data_sm.message_payload;
+    pdu->u.data_sm.message_payload = NULL;
+
+    /* check sar_msg_ref_num, sar_segment_seqnum, sar_total_segments */
+    if (smpp_esme->version > 0x33 &&
+    	pdu->u.data_sm.sar_msg_ref_num >= 0 && pdu->u.data_sm.sar_segment_seqnum > 0 && pdu->u.data_sm.sar_total_segments > 0) {
+    	/*
+    		For GSM networks, the concatenation related TLVs (sar_msg_ref_num, sar_total_segments, sar_segment_seqnum)
+    		or port addressing related TLVs
+    		(source_port, dest_port) cannot be used in conjunction with encoded User Data Header in the short_message
+    		(user data) field. This means that the above listed TLVs cannot be used if the User Data Header Indicator flag is set.
+    	*/
+    	if (pdu->u.data_sm.esm_class & ESM_CLASS_SUBMIT_UDH_INDICATOR) {
+    		error(0, "SMPP[%s]: sar_msg_ref_num, sar_segment_seqnum, sar_total_segments in conjuction with UDHI used, rejected.",
+    			  octstr_get_cstr(smpp_esme->system_id));
+    		*reason = SMPP_ESME_RINVTLVVAL;
+    		goto error;
+    	}
+    	/* create multipart UDH */
+    	prepend_catenation_udh(msg,
+    						   pdu->u.data_sm.sar_segment_seqnum,
+    						   pdu->u.data_sm.sar_total_segments,
+    						   pdu->u.data_sm.sar_msg_ref_num);
+    }
+
+    /*
+     * Encode udh if udhi set
+     * for reference see GSM03.40, section 9.2.3.24
+     */
+    if (pdu->u.data_sm.esm_class & ESM_CLASS_SUBMIT_UDH_INDICATOR) {
+        int udhl;
+        udhl = octstr_get_char(msg->sms.msgdata, 0) + 1;
+        debug("bb.sms.smpp",0,"SMPP[%s]: UDH length read as %d",
+              octstr_get_cstr(smpp_esme->system_id), udhl);
+        if (udhl > octstr_len(msg->sms.msgdata)) {
+            error(0, "SMPP[%s]: Malformed UDH length indicator 0x%03x while message length "
+                  "0x%03lx. Discarding MO message.", octstr_get_cstr(smpp_esme->system_id),
+                  udhl, octstr_len(msg->sms.msgdata));
+            *reason = SMPP_ESME_RINVESMCLASS;
+            goto error;
+        }
+        msg->sms.udhdata = octstr_copy(msg->sms.msgdata, 0, udhl);
+        octstr_delete(msg->sms.msgdata, 0, udhl);
+    }
+
+    dcs_to_fields(&msg, pdu->u.data_sm.data_coding);
+
+    /* handle default data coding */
+    smpp_pdu_util_compute_inbound_dcs(msg, smpp_esme->alt_charset, pdu->u.data_sm.data_coding, pdu->u.data_sm.esm_class);
+    
+    msg->sms.time = time(NULL);
+
+    /* set priority flag */
+
+    if (msg->sms.meta_data == NULL)
+        msg->sms.meta_data = octstr_create("");
+    meta_data_set_values(msg->sms.meta_data, pdu->u.data_sm.tlv, "smpp", 1);
+    
+    
+    switch (pdu->u.data_sm.registered_delivery & 0x03) {
+        case 1:
+            msg->sms.dlr_mask = (DLR_SUCCESS | DLR_FAIL | DLR_SMSC_FAIL);
+            break;
+        case 2:
+            msg->sms.dlr_mask = (DLR_FAIL | DLR_SMSC_FAIL);
+            break;
+        default:
+            msg->sms.dlr_mask = 0;
+            break;
+    }
+
+    return msg;
+
+error:
+    msg_destroy(msg);
+    return NULL;
+}
