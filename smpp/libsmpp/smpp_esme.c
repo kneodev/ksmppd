@@ -613,6 +613,7 @@ SMPPHTTPCommandResult *smpp_esme_unbind_command(SMPPServer *smpp_server, List *c
         message = octstr_create("You must specify a 'system-id' parameter");
         smpp_http_command_result->status = HTTP_NOT_ACCEPTABLE;
     } else {
+        octstr_convert_range(system_id, 0, octstr_len(system_id), tolower);
         smpp_esme_global = dict_get(smpp_esme_data->esmes, system_id);
         if(smpp_esme_global) {
             if(octstr_len(bind_id)) {
