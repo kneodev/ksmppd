@@ -645,7 +645,7 @@ SMPPHTTPCommandResult *smpp_esme_unbind_command(SMPPServer *smpp_server, List *c
             message = octstr_format("%ld binds disconnected", unbinds_sent);
         } else {
             smpp_http_command_result->status = HTTP_NOT_FOUND;
-            message = octstr_format("No such system-id '%s' found", system_id);
+            message = octstr_format("No such system-id '%S' found", system_id);
         }
     }
     
