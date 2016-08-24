@@ -128,6 +128,7 @@ void smpp_listener_event(evutil_socket_t fd, short what, void *arg)
     
     if(what & EV_READ) {
         debug("smpp.listener.event", 0, "Got a read event for SMPP esme connection %ld", smpp_esme->id);
+        gw_rwlock_wrlock(smpp_esme->conn_lock);
         while((result = smpp_listener_read_pdu(smpp_esme, &len, &pdu)) > 0) {
             counter_set(smpp_esme->errors, 0L);
             smpp_queued_pdu = smpp_queued_pdu_create();
@@ -135,6 +136,7 @@ void smpp_listener_event(evutil_socket_t fd, short what, void *arg)
             smpp_queued_pdu->smpp_esme = smpp_esme;
             smpp_queues_add_inbound(smpp_queued_pdu);
         }
+        gw_rwlock_unlock(smpp_esme->conn_lock);
         
         if(result == 0) {
             /* Just no data, who cares*/
