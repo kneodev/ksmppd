@@ -85,8 +85,8 @@ static int smpp_listener_read_pdu(SMPPEsme *smpp_esme, long *len, SMPP_PDU **pdu
     if (*len == 0) {
         *len = smpp_pdu_read_len(conn);
         if (*len == -1) {
-            error(0, "SMPP[%s]: Client sent garbage, ignored.",
-                  octstr_get_cstr(smpp_esme->system_id));
+            error(0, "SMPP[%s:%ld]: Client sent garbage, ignored.",
+                  octstr_get_cstr(smpp_esme->system_id), smpp_esme->id);
             return -2;
         } else if (*len == 0) {
             if (conn_eof(conn) || conn_error(conn))
@@ -95,12 +95,12 @@ static int smpp_listener_read_pdu(SMPPEsme *smpp_esme, long *len, SMPP_PDU **pdu
         }
     }
 
-    os = smpp_pdu_read_data(conn, *len);
-    if (os == NULL) {
-        if (conn_eof(conn) || conn_error(conn))
+    do {
+        os = smpp_pdu_read_data(conn, *len);
+        if (conn_eof(conn) || conn_error(conn)) {
             return -1;
-        return 0;
-    }
+        }
+    } while(os == NULL);
     *len = 0;
 
     *pdu = smpp_pdu_unpack(smpp_esme->system_id, os);
@@ -127,8 +127,7 @@ void smpp_listener_event(evutil_socket_t fd, short what, void *arg)
     SMPPQueuedPDU *smpp_queued_pdu;
     
     if(what & EV_READ) {
-        debug("smpp.listener.event", 0, "Got a read event for SMPP esme connection %ld", smpp_esme->id);
-        gw_rwlock_wrlock(smpp_esme->conn_lock);
+        debug("smpp.listener.event", 0, "Got a read event for SMPP esme connection %ld %d", smpp_esme->id, smpp_esme->bind_type);
         while((result = smpp_listener_read_pdu(smpp_esme, &len, &pdu)) > 0) {
             counter_set(smpp_esme->errors, 0L);
             smpp_queued_pdu = smpp_queued_pdu_create();
@@ -136,7 +135,6 @@ void smpp_listener_event(evutil_socket_t fd, short what, void *arg)
             smpp_queued_pdu->smpp_esme = smpp_esme;
             smpp_queues_add_inbound(smpp_queued_pdu);
         }
-        gw_rwlock_unlock(smpp_esme->conn_lock);
         
         if(result == 0) {
             /* Just no data, who cares*/

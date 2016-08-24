@@ -934,8 +934,7 @@ SMPPEsme *smpp_esme_create() {
     smpp_esme->ack_process_lock = gw_rwlock_create();
     smpp_esme->pending_routing = counter_create();
     smpp_esme->ip = NULL;
-    smpp_esme->conn_lock = gw_rwlock_create();
-
+    
     return smpp_esme;
 }
 
@@ -966,7 +965,6 @@ void smpp_esme_destroy(SMPPEsme *smpp_esme) {
     
     gw_rwlock_destroy(smpp_esme->event_lock);
     gw_rwlock_destroy(smpp_esme->ack_process_lock);
-    gw_rwlock_destroy(smpp_esme->conn_lock);
     
     gw_free(smpp_esme);
 }

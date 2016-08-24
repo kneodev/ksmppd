@@ -180,8 +180,6 @@ extern "C" {
         SMPPEsmeGlobal *smpp_esme_global;
         
         Octstr *ip;
-        
-        RWLock *conn_lock;
     } SMPPEsme;
     
     SMPPESMEAuthResult *smpp_esme_auth_result_create();

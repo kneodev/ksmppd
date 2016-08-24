@@ -339,11 +339,11 @@ void smpp_queues_handle_submit_sm(SMPPQueuedPDU *smpp_queued_pdu) {
         unsigned long simulation_count = counter_value(smpp_esme->inbound_processed);
 
         if (smpp_esme->simulate_temporary_failure_every && ((simulation_count % smpp_esme->simulate_temporary_failure_every) == 0)) {
-            debug("smpp.queues.handle.submit.sm", 0, "SMPP[%s] Simulating temporary failure", octstr_get_cstr(smpp_esme->system_id));
+            debug("smpp.queues.handle.submit.sm", 0, "SMPP[%s:%ld] Simulating temporary failure", octstr_get_cstr(smpp_esme->system_id), smpp_esme->id);
             smpp_queued_response_pdu->pdu->u.submit_sm_resp.command_status = SMPP_ESME_RMSGQFUL;
             smpp_queues_add_outbound(smpp_queued_response_pdu);
         } else if (smpp_esme->simulate_permanent_failure_every && ((simulation_count % smpp_esme->simulate_permanent_failure_every) == 0)) {
-            debug("smpp.queues.handle.submit.sm", 0, "SMPP[%s] Simulating permanent failure", octstr_get_cstr(smpp_esme->system_id));
+            debug("smpp.queues.handle.submit.sm", 0, "SMPP[%s:%ld] Simulating permanent failure", octstr_get_cstr(smpp_esme->system_id), smpp_esme->id);
             smpp_queued_response_pdu->pdu->u.submit_sm_resp.command_status = SMPP_ESME_RSUBMITFAIL;
             smpp_queues_add_outbound(smpp_queued_response_pdu);
         } else {
