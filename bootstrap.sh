@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-REVISION="5164"
+REVISION="5173"
 NAME="ksmppd"
 SVN=`which svn`
 PATCH=`which patch`
