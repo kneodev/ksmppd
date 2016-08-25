@@ -935,6 +935,8 @@ SMPPEsme *smpp_esme_create() {
     smpp_esme->pending_routing = counter_create();
     smpp_esme->ip = NULL;
     
+    smpp_esme->pending_len = 0;
+    
     return smpp_esme;
 }
 
