@@ -151,10 +151,9 @@ static int check_args(int i, int argc, char **argv) {
 
     gwlib_init();
     cf_index = get_and_set_debugs(argc, argv, check_args);
-    
     setup_signal_handlers();
-    
-    
+
+
     SMPPServer *smpp_server = smpp_server_create();
     
     smpp_server_global = smpp_server;
@@ -173,9 +172,11 @@ static int check_args(int i, int argc, char **argv) {
 
     report_versions("ksmppd");
 
-    debug("smpp", 0, "----------------------------------------------");
-    debug("smpp", 0, SMPP_SERVER_NAME " kmppd version %s starting", SMPP_SERVER_VERSION);
-    
+    info(0, "----------------------------------------------");
+    info(0, SMPP_SERVER_NAME " kmppd version %s starting", GITVERSION);
+    info(0, SMPP_SERVER_NAME " system platform ", PLATFORMINFO);   
+    info(0, "----------------------------------------------");
+
     smpp_server->server_status = SMPP_SERVER_STATUS_RUNNING;
     
     smpp_listener_start(smpp_server); // This request will block until stopped

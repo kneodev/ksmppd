@@ -48,6 +48,15 @@ patch -p0 < "../kannel-svn-r${REVISION}.patch"
 safe_exec "make libgw.a libgwlib.a libwap.a gw-config"
 
 cd $BUILD_PATH
+safe_exec "curl -O -L ftp://ftp.gnu.org/gnu/shtool/shtool-2.0.8.tar.gz"
+
+tar zxvf shtool-2.0.8.tar.gz
+cd shtool-2.0.8
+
+./configure
+make
+
+cd ..
 
 safe_exec "curl -O -L  https://github.com/libevent/libevent/releases/download/release-2.0.22-stable/libevent-2.0.22-stable.tar.gz"
 
