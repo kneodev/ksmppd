@@ -278,13 +278,31 @@ void smpp_route_init(SMPPServer *smpp_server) {
    
     CfgGroup *grp = cfg_get_single_group(smpp_server->running_configuration, octstr_imm("smpp-routing"));
     long tmp;
+    Octstr *tmp_str;
     
     if(!grp) {
         warning(0, "No 'smpp-routing' group specified, using defaults (database)");
         tmp = SMPP_ROUTING_DEFAULT_METHOD;
     } else {
         if(cfg_get_integer(&tmp, grp, octstr_imm("routing-method")) == -1) {
-            tmp = SMPP_ROUTING_DEFAULT_METHOD;
+            /* Unable to read an integer */
+            tmp_str = cfg_get(grp, octstr_imm("routing-method"));
+            if(!octstr_len(tmp_str)) {
+                tmp = SMPP_ROUTING_DEFAULT_METHOD;
+            } else {
+                /* Read a non-integer string */
+                if(octstr_case_compare(tmp_str, octstr_imm("database")) == 0) {
+                    tmp = SMPP_ROUTING_METHOD_DATABASE;
+                } else if(octstr_case_compare(tmp_str, octstr_imm("http")) == 0) {
+                    tmp = SMPP_ROUTING_METHOD_HTTP;
+                } else if(octstr_case_compare(tmp_str, octstr_imm("plugin")) == 0) {
+                    tmp = SMPP_ROUTING_METHOD_PLUGIN;
+                    panic(0, "Plugin based routing not yet implemented");
+                } else {
+                    panic(0, "Unknown routing method '%s'", octstr_get_cstr(tmp_str));
+                }
+            }
+            octstr_destroy(tmp_str);
         }
     }
    
@@ -295,6 +313,8 @@ void smpp_route_init(SMPPServer *smpp_server) {
         smpp_routing->shutdown = smpp_route_shutdown_database;
     } else if(tmp == SMPP_ROUTING_METHOD_HTTP) {
         smpp_routing->init = smpp_http_client_route_init;
+    } else if(tmp == SMPP_ROUTING_METHOD_PLUGIN) {
+        info(0, "Initializing plugin based routing");
     }
     
     

@@ -134,6 +134,7 @@ int smpp_server_reconfigure(SMPPServer *smpp_server) {
     gw_rwlock_wrlock(smpp_server->config_lock);
     Cfg *cfg = cfg_create(smpp_server->config_filename);
     CfgGroup *grp;
+    Octstr *tmp_str;
     
     if(!smpp_server->configured) {
         debug("smpp", 0, "Adding configuration hooks");
@@ -210,8 +211,28 @@ int smpp_server_reconfigure(SMPPServer *smpp_server) {
                 }
                 
                 if(cfg_get_integer(&smpp_server->authentication_method, grp, octstr_imm("auth-method")) == -1) {
-                    debug("smpp", 0, "No 'auth-method' specified, using database as default");
                     smpp_server->authentication_method = SMPP_SERVER_AUTH_METHOD_DATABASE;
+                    tmp_str = cfg_get(grp, octstr_imm("auth-method"));
+                    if(!octstr_len(tmp_str)) {
+                        debug("smpp", 0, "No 'auth-method' specified, using database as default");
+                        smpp_server->authentication_method = SMPP_SERVER_AUTH_METHOD_DATABASE;
+                    } else {
+                        /* Read a non-integer string */
+                        if(octstr_case_compare(tmp_str, octstr_imm("database")) == 0) {
+                            debug("smpp", 0, "Authentication using database");
+                            smpp_server->authentication_method = SMPP_SERVER_AUTH_METHOD_DATABASE;
+                        } else if(octstr_case_compare(tmp_str, octstr_imm("http")) == 0) {
+                            debug("smpp", 0, "Authentication using http");
+                            smpp_server->authentication_method = SMPP_SERVER_AUTH_METHOD_HTTP;
+                        } else if(octstr_case_compare(tmp_str, octstr_imm("plugin")) == 0) {
+                            debug("smpp", 0, "Authentication using plugin");
+                            smpp_server->authentication_method = SMPP_SERVER_AUTH_METHOD_PLUGIN;
+                            panic(0, "Plugin based auth not yet implemented");
+                        } else {
+                            panic(0, "Unknown auth method '%s'", octstr_get_cstr(tmp_str));
+                        }
+                    }
+                    octstr_destroy(tmp_str);
                 }
                 
                 smpp_server->auth_url = cfg_get(grp, octstr_imm("auth-url"));
