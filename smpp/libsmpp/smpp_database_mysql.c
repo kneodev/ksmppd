@@ -279,7 +279,7 @@ List *smpp_database_mysql_get_routes(SMPPServer *smpp_server, int direction, Oct
 
     DBPoolConn *conn;
 
-    sql = octstr_format("SELECT `regex`, `cost`, `system_id`, `smsc_id` FROM %S WHERE direction = %d", smpp_server->database_route_table, direction);
+    sql = octstr_format("SELECT `regex`, `cost`, `system_id`, `smsc_id`, `source_regex` FROM %S WHERE direction = %d", smpp_server->database_route_table, direction);
 
     if(octstr_len(service)) {
         octstr_format_append(sql, " AND system_id = ?");
@@ -307,11 +307,19 @@ List *smpp_database_mysql_get_routes(SMPPServer *smpp_server, int direction, Oct
             
             smpp_route->regex = gw_regex_comp(gwlist_get(row, 0), REG_EXTENDED);
             smpp_route->smsc_id = octstr_duplicate(gwlist_get(row,3));
+
+            if(octstr_len(gwlist_get(row, 4))) {
+                smpp_route->source_regex = gw_regex_comp(gwlist_get(row, 4), REG_EXTENDED);
+            }
+
+            if(!smpp_route->source_regex) {
+                debug("smpp.database.mysql.get.routes", 0, "No source-regex, allowing all toward %s", octstr_get_cstr(gwlist_get(row,0)));
+            }
             
             if(!smpp_route->regex) {
                 error(0, "Failed to compile regex %s, ignoring",octstr_get_cstr(gwlist_get(row, 0)));
             } else {
-                debug("smpp.database.mysql.get.routes", 0, "Added route direction = %d for %s via %s", smpp_route->direction, octstr_get_cstr(gwlist_get(row,0)), octstr_get_cstr(smpp_route->system_id));
+                debug("smpp.database.mysql.get.routes", 0, "Added route direction = %d for %s from %s via %s", smpp_route->direction, octstr_get_cstr(gwlist_get(row,0)), octstr_get_cstr(gwlist_get(row, 4)), octstr_get_cstr(smpp_route->system_id));
                 gwlist_produce(routes, smpp_route);
             }
             
@@ -531,6 +539,33 @@ int smpp_database_mysql_init_tables(SMPPServer *smpp_server, SMPPDatabase *smpp_
     } else {
         res = 1;
     }
+
+    octstr_destroy(sql);
+    
+    sql = octstr_format("CREATE TABLE IF NOT EXISTS %S ( "
+      "`system_id` varchar(15) NOT NULL, "
+      "`password` varchar(64) NOT NULL, "
+      "`throughput` double(10,5) NOT NULL DEFAULT '0.00000',"
+      "`default_smsc` varchar(64) DEFAULT NULL,"
+      "`default_cost` double NOT NULL,"
+      "`enable_prepaid_billing` int(10) unsigned NOT NULL DEFAULT '0',"
+      "`credit` double NOT NULL DEFAULT '0',"
+      "`callback_url` varchar(255) DEFAULT NULL,"
+      "`simulate` tinyint(1) NOT NULL DEFAULT '0',"
+      "`simulate_deliver_every` int(10) unsigned NOT NULL,"
+      "`simulate_permanent_failure_every` int(10) unsigned NOT NULL,"
+      "`simulate_temporary_failure_every` int(10) unsigned NOT NULL,"
+      "`simulate_mo_every` int(10) unsigned NOT NULL,"
+      "`max_binds` int(10) unsigned NOT NULL DEFAULT '0',"
+      "`connect_allow_ip` text,"
+      "PRIMARY KEY (`system_id`)"
+      ");", smpp_server->database_user_table);
+    if ((res = dbpool_conn_update(conn, sql, NULL)) == -1) {
+        error(0, "Query error '%s'", octstr_get_cstr(sql));
+        res = 0;
+    } else {
+        res = 1;
+    }
     
     octstr_destroy(sql);
     msg_destroy(msg);
@@ -572,7 +607,15 @@ int smpp_database_mysql_init_tables(SMPPServer *smpp_server, SMPPDatabase *smpp_
             dbpool_conn_update(conn, sql, NULL);
             running_version = our_version;
         }
-        
+
+        our_version = 3;
+        if(running_version < our_version) {
+            octstr_destroy(sql);
+            sql = octstr_format("ALTER TABLE %S ADD COLUMN source_regex text", smpp_server->database_route_table);
+            dbpool_conn_update(conn, sql, NULL);
+            running_version = our_version;
+        }
+
         octstr_destroy(sql);
         sql = octstr_format("UPDATE %S SET `version` = %ld WHERE `component` = ?", smpp_server->database_version_table, running_version);
         dbpool_conn_update(conn, sql, binds);
