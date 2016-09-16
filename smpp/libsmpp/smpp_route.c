@@ -107,6 +107,7 @@ SMPPRoute *smpp_route_create() {
     smpp_route->regex = NULL;
     smpp_route->system_id = NULL;
     smpp_route->smsc_id = NULL;
+    smpp_route->source_regex = NULL;
     return smpp_route;
 }
 
@@ -114,6 +115,7 @@ void smpp_route_destroy(SMPPRoute *smpp_route) {
     octstr_destroy(smpp_route->system_id);
     octstr_destroy(smpp_route->smsc_id);
     gw_regex_destroy(smpp_route->regex);
+    gw_regex_destroy(smpp_route->source_regex);
     gw_free(smpp_route);
 }
 
@@ -180,9 +182,19 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
             for(i=0;i<num_routes;i++) {
                 route = gwlist_get(routes, i);
                 found = gw_regex_match_pre(route->regex, msg->sms.receiver);
-                
+
                 if(found) {
-                    break;
+                    if(route->source_regex) {
+                        found = 0;
+                        found = gw_regex_match_pre(route->source_regex, msg->sms.sender);
+                        if(found) {
+                            break;
+                        } else {
+                            debug("smpp.route.message.database", 0, "Found matching outbound route for %s but declined sender %s", octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(msg->sms.sender));
+                        }
+                    } else {
+                        break;
+                    }                    
                 }
             }
             
@@ -191,7 +203,7 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
                 smpp_route_status->cost = route->cost;
                 octstr_destroy(msg->sms.smsc_id);
                 msg->sms.smsc_id = octstr_duplicate(route->smsc_id);
-                debug("smpp.route.message.database", 0, "SMPP[%s] Found outbound route for %s towards %s", octstr_get_cstr(system_id), octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(msg->sms.smsc_id));
+                debug("smpp.route.message.database", 0, "SMPP[%s] Found outbound route from %s for %s towards %s", octstr_get_cstr(system_id), octstr_get_cstr(msg->sms.sender), octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(msg->sms.smsc_id));
                 callback(context, smpp_route_status);
             } else {
                 callback(context, smpp_route_status);
@@ -204,7 +216,17 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
                 found = gw_regex_match_pre(route->regex, msg->sms.receiver);
                 
                 if(found) {
-                    break;
+                    if(route->source_regex) {
+                        found = 0;
+                        found = gw_regex_match_pre(route->source_regex, msg->sms.sender);
+                        if(found) {
+                            break;
+                        } else {
+                            debug("smpp.route.message.database", 0, "Found matching inbound route for %s but declined sender %s", octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(msg->sms.sender));
+                        }
+                    } else {
+                        break;
+                    } 
                 }
             }
             
@@ -213,7 +235,7 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
                 smpp_route_status->cost = route->cost;
                 octstr_destroy(msg->sms.service);
                 msg->sms.service = octstr_duplicate(route->system_id);
-                debug("smpp.route.message.database", 0, "SMPP[%s] Found inbound route for %s from %s", octstr_get_cstr(route->system_id), octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(smsc_id));
+                debug("smpp.route.message.database", 0, "SMPP[%s] Found inbound route from %s for %s from %s", octstr_get_cstr(route->system_id), octstr_get_cstr(msg->sms.sender), octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(smsc_id));
                 callback(context, smpp_route_status);
             } else {
                 callback(context, smpp_route_status);

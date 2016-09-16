@@ -91,6 +91,7 @@ extern "C" {
         double cost;
         int direction;
         void *context;
+        regex_t *source_regex;
     } SMPPRoute;
     
     typedef struct {
