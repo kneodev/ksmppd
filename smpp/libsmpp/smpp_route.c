@@ -78,6 +78,7 @@
 #include "smpp_route.h"
 #include "smpp_http_server.h"
 #include "smpp_http_client.h"
+#include "smpp_plugin.h"
 
 SMPPRouteStatus *smpp_route_status_create(Msg *msg) {
     SMPPRouteStatus *smpp_route_status = gw_malloc(sizeof(SMPPRouteStatus));
@@ -227,6 +228,18 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
     gw_rwlock_unlock(smpp_routing->lock);
 }
 
+void smpp_route_message_plugin(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context) {
+    SMPPPlugin *smpp_plugin = smpp_server->plugin_route;
+    if(smpp_plugin) {
+        if(smpp_plugin->route_message) {
+            smpp_plugin->route_message(smpp_plugin, direction, smsc_id, system_id, msg, callback, context);
+            return;
+        }
+    }
+    SMPPRouteStatus *smpp_route_status = smpp_route_status_create(msg);
+    callback(context,  smpp_route_status);
+}
+
 void smpp_route_message(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context) {
     SMPPRouting *smpp_routing = smpp_server->routing;
     if(smpp_routing->route_message) {
@@ -271,6 +284,7 @@ void smpp_route_init(SMPPServer *smpp_server) {
     smpp_routing->outbound_routes = NULL;
     smpp_routing->reload = NULL;
     smpp_routing->route_message = NULL;
+    smpp_routing->shutdown = NULL;
     smpp_routing->init = NULL;
     smpp_routing->outbound_lock = gw_rwlock_create();
     smpp_routing->initialized = 0;
@@ -297,7 +311,19 @@ void smpp_route_init(SMPPServer *smpp_server) {
                     tmp = SMPP_ROUTING_METHOD_HTTP;
                 } else if(octstr_case_compare(tmp_str, octstr_imm("plugin")) == 0) {
                     tmp = SMPP_ROUTING_METHOD_PLUGIN;
-                    panic(0, "Plugin based routing not yet implemented");
+                    octstr_destroy(tmp_str);
+                    tmp_str = cfg_get(grp, octstr_imm("plugin-id"));
+                    if(!octstr_len(tmp_str)) {
+                        panic(0, "Requested plugin routing but no id specified, cannot continue");
+                    } else {
+                        smpp_server->plugin_route = smpp_plugin_init(smpp_server, tmp_str);
+                        if(!smpp_server->plugin_route || !smpp_server->plugin_route->route_message) {
+                            panic(0, "Plugin based routing initialization failed.");
+                        } else {
+                            info(0, "Plugin based routing initialization OK.");
+                            smpp_routing->route_message = smpp_route_message_plugin;
+                        }
+                    }
                 } else {
                     panic(0, "Unknown routing method '%s'", octstr_get_cstr(tmp_str));
                 }

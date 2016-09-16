@@ -200,7 +200,6 @@ void smpp_queues_msg_set_dlr_url(SMPPEsme *smpp_esme, Msg *msg) {
     octstr_destroy(msg->sms.dlr_url);
     msg->sms.dlr_url = octstr_duplicate(smpp_esme->system_id);
     Octstr *id = smpp_uuid_get(msg->sms.id);
-    debug("smpp.queues.simulation.thread", 0, "SMPP[%s] Simulating delivery report ID:%s", octstr_get_cstr(smpp_esme->system_id), octstr_get_cstr(id));
     octstr_format_append(msg->sms.dlr_url, "|%ld|%S", time(NULL), id);
     octstr_destroy(id);
 }
@@ -212,6 +211,12 @@ void smpp_queues_submit_routing_done(void *context, SMPPRouteStatus *smpp_route_
     if(smpp_route_status->status == SMPP_ESME_ROK) {
         if(!smpp_queued_response_pdu->smpp_esme->smpp_esme_global->enable_prepaid_billing || smpp_database_deduct_credit(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->smpp_esme->system_id, cost)) {
             info(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);
+            
+            octstr_destroy(smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id);
+            smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id = smpp_uuid_get(smpp_queued_response_pdu->msg->sms.id);
+            
+            smpp_queues_msg_set_dlr_url(smpp_queued_response_pdu->smpp_esme, smpp_queued_response_pdu->msg);
+            
             smpp_bearerbox_add_message(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->msg, smpp_queues_callback_submit_sm, smpp_queued_response_pdu);
         } else {
             warning(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f, but not enough credit", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);
@@ -227,6 +232,12 @@ void smpp_queues_submit_routing_done(void *context, SMPPRouteStatus *smpp_route_
             cost = smpp_route_status->parts * smpp_queued_response_pdu->smpp_esme->default_cost;
             if(!smpp_queued_response_pdu->smpp_esme->smpp_esme_global->enable_prepaid_billing || smpp_database_deduct_credit(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->smpp_esme->system_id, cost)) {
                 info(0, "SMPP[%s] Using default routing for %s to %s for cost %f", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), smpp_queued_response_pdu->smpp_esme->default_cost);
+                
+                octstr_destroy(smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id);
+                smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id = smpp_uuid_get(smpp_queued_response_pdu->msg->sms.id);
+
+                smpp_queues_msg_set_dlr_url(smpp_queued_response_pdu->smpp_esme, smpp_queued_response_pdu->msg);
+                
                 smpp_bearerbox_add_message(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->msg, smpp_queues_callback_submit_sm, smpp_queued_response_pdu);
             } else {
                 warning(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f, but not enough credit", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);

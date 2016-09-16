@@ -116,6 +116,8 @@ extern "C" {
         int enable_prepaid_billing;
         
         Octstr *allowed_ips;
+        
+        Octstr *alt_charset;
     } SMPPESMEAuthResult;
     
     typedef struct {

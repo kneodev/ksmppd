@@ -73,6 +73,7 @@
 #include "gw/msg.h"
 #include "smpp_route.h"
 #include "smpp_http_server.h"
+#include "smpp_plugin.h"
 
 SMPPServer *smpp_server_create() {
     SMPPServer *smpp_server = gw_malloc(sizeof (SMPPServer));
@@ -98,6 +99,9 @@ SMPPServer *smpp_server_create() {
     smpp_server->bearerbox = NULL;
     smpp_server->database_pdu_table = NULL;
     smpp_server->auth_url = NULL;
+    smpp_server->plugin_auth = NULL;
+    smpp_server->plugin_route = NULL;
+    smpp_server->plugins = dict_create(8, (void(*)(void *))smpp_plugin_destroy);
 
     return smpp_server;
 }
@@ -106,6 +110,7 @@ void smpp_server_destroy(SMPPServer *smpp_server) {
     smpp_http_server_shutdown(smpp_server);
     smpp_database_shutdown(smpp_server);
     smpp_route_shutdown(smpp_server);
+    dict_destroy(smpp_server->plugins);
     octstr_destroy(smpp_server->server_id);
     gwlist_destroy(smpp_server->bearerbox_inbound_queue, (void(*)(void *))msg_destroy);
     gwlist_destroy(smpp_server->bearerbox_outbound_queue, (void(*)(void *))msg_destroy);
@@ -135,6 +140,7 @@ int smpp_server_reconfigure(SMPPServer *smpp_server) {
     Cfg *cfg = cfg_create(smpp_server->config_filename);
     CfgGroup *grp;
     Octstr *tmp_str;
+    Octstr *plugin_id;
     
     if(!smpp_server->configured) {
         debug("smpp", 0, "Adding configuration hooks");
@@ -225,9 +231,24 @@ int smpp_server_reconfigure(SMPPServer *smpp_server) {
                             debug("smpp", 0, "Authentication using http");
                             smpp_server->authentication_method = SMPP_SERVER_AUTH_METHOD_HTTP;
                         } else if(octstr_case_compare(tmp_str, octstr_imm("plugin")) == 0) {
+                            plugin_id = cfg_get(grp, octstr_imm("auth-plugin-id"));
+                            
+                            if(!octstr_len(plugin_id)) {
+                                panic(0, "Requested plugin based authentication but no 'auth-plugin-id' set");
+                            }
+                            
                             debug("smpp", 0, "Authentication using plugin");
                             smpp_server->authentication_method = SMPP_SERVER_AUTH_METHOD_PLUGIN;
-                            panic(0, "Plugin based auth not yet implemented");
+                            smpp_server->plugin_auth = smpp_plugin_init(smpp_server, plugin_id);
+                            if(smpp_server->plugin_auth == NULL) {
+                                panic(0, "Plugin '%s' initialization failed, cannot continue", octstr_get_cstr(plugin_id));
+                            } else {
+                                if(!smpp_server->plugin_auth->authenticate) {
+                                    panic(0, "Plugin '%s' has no registered auth function, cannot continue", octstr_get_cstr(plugin_id));
+                                }
+                            }
+                            
+                            octstr_destroy(plugin_id);
                         } else {
                             panic(0, "Unknown auth method '%s'", octstr_get_cstr(tmp_str));
                         }

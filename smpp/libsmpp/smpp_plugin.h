@@ -60,94 +60,43 @@
  * 
  */ 
 
-#ifndef SMPP_SERVER_H
-#include <signal.h>
+/*
+ * Implementation of dynamic library plugins
+ * 
+ * Donald Jackson <donald@ddj.co.za>
+ *
+ */
 
-#define SMPP_SERVER_H
-#define SMPP_SERVER_NAME "KSMPPD"
-#define SMPP_SERVER_VERSION "0.6"
-
-#define SMPP_SERVER_AUTH_METHOD_DATABASE 1
-#define SMPP_SERVER_AUTH_METHOD_HTTP 2
-#define SMPP_SERVER_AUTH_METHOD_PLUGIN 4
-
-#define SMPP_SERVER_STATUS_STARTUP 1
-#define SMPP_SERVER_STATUS_RUNNING 2
-#define SMPP_SERVER_STATUS_LOG_REOPEN 4
-#define SMPP_SERVER_STATUS_SHUTDOWN 8
+#ifndef SMPP_PLUGIN_H
+#define SMPP_PLUGIN_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+    typedef struct SMPPPlugin SMPPPlugin;
+
+    struct SMPPPlugin {
+        Octstr *id;
+        Octstr *args;
+        SMPPESMEAuthResult *(*authenticate)(SMPPPlugin *smpp_plugin, Octstr *system_id, Octstr *password);
+        void (*route_message)(SMPPPlugin *smpp_plugin, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context);
+        int (*init)(SMPPPlugin *smpp_plugin);
+        void (*reload)(SMPPPlugin *smpp_plugin);
+        void (*shutdown)(SMPPPlugin *smpp_plugin);
+        void *context;
+    };
     
-    typedef struct {
-        Cfg *running_configuration;
-        Octstr *config_filename;
-        RWLock *config_lock;
-        Octstr *server_id;
-        
-        List *bearerbox_outbound_queue;
-        List *bearerbox_inbound_queue;
-        
-        int configured;
-        
-        volatile sig_atomic_t server_status;
-        
-        long smpp_port;
-        
-        int enable_ssl;
-        
-        void *esme_data;
-        
-        gw_prioqueue_t *inbound_queue;
-        gw_prioqueue_t *outbound_queue;
-        gw_prioqueue_t *simulation_queue;
-        
-        long num_inbound_queue_threads;
-        long num_outbound_queue_threads;
-        
-        Counter *running_threads;
-        
-        Octstr *database_type;
-        Octstr *database_config;
-        Octstr *database_user_table;
-        Octstr *database_store_table;
-        Octstr *database_pdu_table;
-        Octstr *database_route_table;
-        Octstr *database_version_table;
-        
-        int database_enable_queue;
-        
-        
-        void *database;
-        void *bearerbox;
-        void *routing;
-        void *http_server;
-        void *http_client;
-        
-        
-        
-        struct event_base *event_base;
-        struct evconnlistener *event_listener;
-        
-        Counter *esme_counter;
-        long authentication_method;
-        Octstr *auth_url;
-        
-        struct SMPPPlugin *plugin_auth;
-        struct SMPPPlugin *plugin_route;
-        
-        
-        Dict *plugins;
-    } SMPPServer;
+    SMPPPlugin *smpp_plugin_init(SMPPServer *smpp_server, Octstr *id);
+    void smpp_plugin_destroy(SMPPPlugin *smpp_plugin);
+    void smpp_plugin_destroy_real(SMPPPlugin *smpp_plugin);
     
-    SMPPServer *smpp_server_create();
-    void smpp_server_destroy(SMPPServer *smpp_server);
-    int smpp_server_reconfigure(SMPPServer *smpp_server);
+    
+
+
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* SMPP_SERVER_H */
+#endif /* SMPP_PLUGIN_H */
 
