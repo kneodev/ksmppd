@@ -291,6 +291,9 @@ List *smpp_esme_global_get_queued(SMPPServer *smpp_server) {
                 msg_queue = smpp_database_get_stored(smpp_server, report_mo, smpp_esme->system_id, limit);
                 while((smpp_database_msg = gwlist_consume(msg_queue)) != NULL) {
                     pdus = smpp_pdu_msg_to_pdu(smpp_esme, smpp_database_msg->msg);
+                    if(pdus == NULL) {
+                        continue;
+                    }
                     while((pdu = gwlist_consume(pdus)) != NULL) {
                         smpp_queued_pdu = smpp_queued_pdu_create();
                         smpp_queued_pdu->pdu = pdu;

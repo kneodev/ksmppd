@@ -293,7 +293,7 @@ void smpp_bearerbox_routing_done(void *context, SMPPRouteStatus *smpp_route_stat
             info(0, "SMPP[%s] Successfully routed message for %s", octstr_get_cstr(smpp_esme->system_id), octstr_get_cstr(smpp_bearerbox_msg->msg->sms.receiver));
             queued_outbound_pdus = smpp_pdu_msg_to_pdu(smpp_esme, smpp_bearerbox_msg->msg);
 
-            while ((pdu = gwlist_consume(queued_outbound_pdus)) != NULL) {
+            while ((queued_outbound_pdus != NULL) && (pdu = gwlist_consume(queued_outbound_pdus)) != NULL) {
                 smpp_queued_deliver_pdu = smpp_queued_pdu_create();
                 smpp_queued_deliver_pdu->pdu = pdu;
                 smpp_queued_deliver_pdu->system_id = octstr_duplicate(smpp_esme->system_id);
