@@ -75,6 +75,8 @@
 #include "smpp_database.h"
 #include "smpp_http_server.h"
 #include "smpp_http_client.h"
+#include "smpp_route.h"
+#include "smpp_plugin.h"
 
 typedef struct {
     Dict *esmes;
@@ -104,6 +106,7 @@ SMPPESMEAuthResult *smpp_esme_auth_result_create() {
     smpp_esme_auth_result->max_binds = 0;
     smpp_esme_auth_result->enable_prepaid_billing = 0;
     smpp_esme_auth_result->allowed_ips = NULL;
+    smpp_esme_auth_result->alt_charset = NULL;
     
     
     return smpp_esme_auth_result;
@@ -116,6 +119,7 @@ void smpp_esme_auth_result_destroy(SMPPESMEAuthResult *smpp_esme_auth_result) {
     octstr_destroy(smpp_esme_auth_result->default_smsc);
     octstr_destroy(smpp_esme_auth_result->callback_url);
     octstr_destroy(smpp_esme_auth_result->allowed_ips);
+    octstr_destroy(smpp_esme_auth_result->alt_charset);
     gw_free(smpp_esme_auth_result);
 }
 
@@ -349,6 +353,13 @@ SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, O
         smpp_auth_result = smpp_database_auth(smpp_server, system_id, password);
     } else if(smpp_server->authentication_method == SMPP_SERVER_AUTH_METHOD_HTTP) {
         smpp_auth_result = smpp_http_client_auth(smpp_server, system_id, password);
+    } else if(smpp_server->authentication_method == SMPP_SERVER_AUTH_METHOD_PLUGIN) {
+        if(smpp_server->plugin_auth) {
+            info(0, "Authenticating via plugin %s", octstr_get_cstr(smpp_server->plugin_auth->id));
+            smpp_auth_result = smpp_server->plugin_auth->authenticate(smpp_server->plugin_auth, system_id, password);
+        } else {
+            warning(0, "Plugin authentication specified but no plugin configured?");
+        }
     } else {
         warning(0, "Unknown 'auth-method' provided, defaulting to database");
         smpp_auth_result = smpp_database_auth(smpp_server, system_id, password);

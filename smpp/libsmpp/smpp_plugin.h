@@ -59,79 +59,44 @@
  * This product includes software developed by the Kannel Group (http://www.kannel.org/).
  * 
  */ 
-#ifndef SMPP_ROUTE_H
-#define	SMPP_ROUTE_H
 
-#include "gwlib/regex.h"
+/*
+ * Implementation of dynamic library plugins
+ * 
+ * Donald Jackson <donald@ddj.co.za>
+ *
+ */
 
-#ifdef	__cplusplus
+#ifndef SMPP_PLUGIN_H
+#define SMPP_PLUGIN_H
+
+#ifdef __cplusplus
 extern "C" {
 #endif
-    
-    
-#define SMPP_ROUTE_DIRECTION_UNKNOWN 0
-#define SMPP_ROUTE_DIRECTION_OUTBOUND 1
-#define SMPP_ROUTE_DIRECTION_INBOUND 2
+    typedef struct SMPPPlugin SMPPPlugin;
 
-#define SMPP_ROUTING_METHOD_DATABASE 1    
-#define SMPP_ROUTING_METHOD_HTTP 2
-#define SMPP_ROUTING_METHOD_PLUGIN 4
-#define SMPP_ROUTING_DEFAULT_METHOD SMPP_ROUTING_METHOD_DATABASE
-    
-    typedef struct {
-        long parts;
-        double cost;
-        int status;
-    } SMPPRouteStatus;
-    
-    typedef struct {
-        regex_t *regex;
-        Octstr *system_id;
-        Octstr *smsc_id;
-        double cost;
-        int direction;
+    struct SMPPPlugin {
+        Octstr *id;
+        Octstr *args;
+        SMPPESMEAuthResult *(*authenticate)(SMPPPlugin *smpp_plugin, Octstr *system_id, Octstr *password);
+        void (*route_message)(SMPPPlugin *smpp_plugin, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context);
+        int (*init)(SMPPPlugin *smpp_plugin);
+        void (*reload)(SMPPPlugin *smpp_plugin);
+        void (*shutdown)(SMPPPlugin *smpp_plugin);
         void *context;
-    } SMPPRoute;
+    };
     
-    typedef struct {
-        Octstr *system_id;
-        List *routes;
-        RWLock *lock;
-    } SMPPOutboundRoutes;
-
-    typedef struct {
-        Dict *outbound_routes;
-        List *inbound_routes;
-        void (*route_message)(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context);
-        void (*reload)(SMPPServer *smpp_server);
-        void (*shutdown)(SMPPServer *smpp_server);
-        void (*init)(SMPPServer *smpp_server);
-        RWLock *lock;
-        RWLock *outbound_lock;
-        int initialized;
-        Octstr *http_routing_url;
-        void *context;
-    } SMPPRouting;
-
+    SMPPPlugin *smpp_plugin_init(SMPPServer *smpp_server, Octstr *id);
+    void smpp_plugin_destroy(SMPPPlugin *smpp_plugin);
+    void smpp_plugin_destroy_real(SMPPPlugin *smpp_plugin);
     
-    void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context);
     
-    void smpp_route_init(SMPPServer *smpp_server);
-    void smpp_route_shutdown(SMPPServer *smpp_server);
-    void smpp_route_rebuild(SMPPServer *smpp_server);
-    void smpp_route_message(SMPPServer *smpp_server, int direction, Octstr *smsc_id, Octstr *system_id, Msg *msg, void(*callback)(void *context, SMPPRouteStatus *smpp_route_status), void *context);
-    
-    SMPPRoute *smpp_route_create();
-    void smpp_route_destroy(SMPPRoute *smpp_route);
-    
-    SMPPRouteStatus *smpp_route_status_create(Msg *msg);
-    void smpp_route_status_destroy(SMPPRouteStatus *smpp_route_status);
 
 
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* SMPP_ROUTE_H */
+#endif /* SMPP_PLUGIN_H */
 

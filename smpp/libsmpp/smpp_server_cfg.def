@@ -95,6 +95,7 @@ SINGLE_GROUP(ksmppd,
         
     OCTSTR(auth-method)
     OCTSTR(auth-url)
+    OCTSTR(auth-plugin-id)
 )
         
 SINGLE_GROUP(smpp-routing,	
@@ -102,6 +103,7 @@ SINGLE_GROUP(smpp-routing,
     OCTSTR(http-routing-url)
     OCTSTR(http-num-callers)
     OCTSTR(http-max-outstanding-requests)
+    OCTSTR(plugin-id)
 )
         
 SINGLE_GROUP(http-server,	
@@ -116,6 +118,13 @@ MULTI_GROUP(bearerbox-connection,
     OCTSTR(host)
     OCTSTR(port)
     OCTSTR(ssl)
+)
+        
+MULTI_GROUP(ksmppd-plugin,
+    OCTSTR(id)
+    OCTSTR(path)
+    OCTSTR(init-function)
+    OCTSTR(args)
 )
 
 

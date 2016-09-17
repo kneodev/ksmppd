@@ -69,6 +69,7 @@
 
 #define SMPP_SERVER_AUTH_METHOD_DATABASE 1
 #define SMPP_SERVER_AUTH_METHOD_HTTP 2
+#define SMPP_SERVER_AUTH_METHOD_PLUGIN 4
 
 #define SMPP_SERVER_STATUS_STARTUP 1
 #define SMPP_SERVER_STATUS_RUNNING 2
@@ -78,6 +79,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+    
     typedef struct {
         Cfg *running_configuration;
         Octstr *config_filename;
@@ -131,6 +133,12 @@ extern "C" {
         Counter *esme_counter;
         long authentication_method;
         Octstr *auth_url;
+        
+        struct SMPPPlugin *plugin_auth;
+        struct SMPPPlugin *plugin_route;
+        
+        
+        Dict *plugins;
     } SMPPServer;
     
     SMPPServer *smpp_server_create();
