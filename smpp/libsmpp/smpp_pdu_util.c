@@ -480,7 +480,10 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
                 pdu2->u.deliver_sm.message_state = dlr_state;
                 dict_destroy(pdu2->u.deliver_sm.tlv);
                 pdu2->u.deliver_sm.tlv = meta_data_get_values(msg->sms.meta_data, "smpp");
-                pdu2->u.deliver_sm.network_error_code = octstr_duplicate(dict_get(metadata, octstr_imm("network_error_code")));
+                if(metadata != NULL) {
+                    pdu2->u.deliver_sm.network_error_code = octstr_duplicate(
+                            dict_get(metadata, octstr_imm("network_error_code")));
+                }
             }
             pdu2->u.deliver_sm.short_message = octstr_format("id:%S sub:001 dlvrd:%S submit date:%s done date:%s stat:%S err:%s text:%S", msgid2, dlvrd, submit_date_c_str, done_date_c_str, dlr_status, err, tmp_str);
             pdu2->u.deliver_sm.sm_length = octstr_len(pdu2->u.deliver_sm.short_message);
