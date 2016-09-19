@@ -293,7 +293,7 @@ void smpp_bearerbox_routing_done(void *context, SMPPRouteStatus *smpp_route_stat
             info(0, "SMPP[%s] Successfully routed message for %s", octstr_get_cstr(smpp_esme->system_id), octstr_get_cstr(smpp_bearerbox_msg->msg->sms.receiver));
             queued_outbound_pdus = smpp_pdu_msg_to_pdu(smpp_esme, smpp_bearerbox_msg->msg);
 
-            while ((pdu = gwlist_consume(queued_outbound_pdus)) != NULL) {
+            while ((queued_outbound_pdus != NULL) && (pdu = gwlist_consume(queued_outbound_pdus)) != NULL) {
                 smpp_queued_deliver_pdu = smpp_queued_pdu_create();
                 smpp_queued_deliver_pdu->pdu = pdu;
                 smpp_queued_deliver_pdu->system_id = octstr_duplicate(smpp_esme->system_id);
@@ -562,10 +562,11 @@ void smpp_bearerbox_inbound_thread(void *arg) {
                             
                             if(smpp_bearerbox->smpp_bearerbox_state->smpp_server->database_enable_queue) {
                                 warning(0, "ESME[%s] Has no receivers connected, queuing in database", octstr_get_cstr(system_id));
-                                if(smpp_database_add_message(smpp_bearerbox->smpp_bearerbox_state->smpp_server, msg)) {
+                                if(octstr_len(system_id) && smpp_database_add_message(smpp_bearerbox->smpp_bearerbox_state->smpp_server, msg)) {
                                     debug("smpp.bearerbox.inbound.thread", 0, "Queued response message for %s to database", octstr_get_cstr(system_id));
                                     smpp_bearerbox_acknowledge(smpp_bearerbox, ack_id, ack_success);
                                 } else {
+                                    warning(0, "Could not queue message for %s, reporting failure to bearerbox", octstr_get_cstr(system_id));
                                     smpp_bearerbox_acknowledge(smpp_bearerbox, ack_id, ack_failed);
                                 }
                             } else {
@@ -674,6 +675,7 @@ void smpp_bearerbox_requeue_thread(void *arg) {
                     debug("smpp.bearerbox.requeue.thread", 0, "Got MT message to requeue sender = %s receiver = %s", octstr_get_cstr(smpp_database_msg->msg->sms.sender), octstr_get_cstr(smpp_database_msg->msg->sms.receiver));
                     smpp_bearerbox_msg = smpp_bearerbox_msg_create(msg, smpp_bearerbox_requeue_result, smpp_database_msg);
                     gw_prioqueue_produce(smpp_bearerbox_state->outbound_queue, smpp_bearerbox_msg);
+                    busy = 1;
                 } else {
                     debug("smpp.bearerbox.requeue.thread", 0, "Unknown message type received %ld, deleting", msg->sms.sms_type);
                     smpp_database_remove(smpp_database_msg->smpp_server, smpp_database_msg->global_id, 0);
@@ -690,6 +692,7 @@ void smpp_bearerbox_requeue_thread(void *arg) {
                 if(msg->sms.sms_type == mo) {
                     debug("smpp.bearerbox.requeue.thread", 0, "Got MO message to requeue sender = %s receiver = %s", octstr_get_cstr(smpp_database_msg->msg->sms.sender), octstr_get_cstr(smpp_database_msg->msg->sms.receiver));                    
                     smpp_route_message(smpp_server, SMPP_ROUTE_DIRECTION_INBOUND, smpp_database_msg->msg->sms.smsc_id, NULL, smpp_database_msg->msg, smpp_bearerbox_requeue_routing_done, smpp_database_msg);
+                    busy = 1;
                 } else {
                     debug("smpp.bearerbox.requeue.thread", 0, "Unknown message type received %ld, deleting", msg->sms.sms_type);
                     smpp_database_remove(smpp_database_msg->smpp_server, smpp_database_msg->global_id, 0);

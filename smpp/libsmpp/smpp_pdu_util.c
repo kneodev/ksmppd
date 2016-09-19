@@ -58,7 +58,7 @@
  * 
  * This product includes software developed by the Kannel Group (http://www.kannel.org/).
  * 
- */ 
+ */
 
 #include "gwlib/gwlib.h"
 #include "gw/smsc/smpp_pdu.h"
@@ -256,6 +256,8 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
     long pos;
     Msg *msg2;
 
+    Dict *metadata;
+
     pdu = smpp_pdu_create(deliver_sm, 0);
 
     pdu->u.deliver_sm.source_addr = octstr_duplicate(msg->sms.sender);
@@ -341,6 +343,8 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
 
     /* Is this a delivery report? */
     if (msg->sms.sms_type == report_mo) {
+        metadata = meta_data_get_values(msg->sms.meta_data, "smpp");
+
         pdu->u.deliver_sm.esm_class |= ESM_CLASS_DELIVER_SMSC_DELIVER_ACK;
         dlrtype = msg->sms.dlr_mask;
 
@@ -352,6 +356,7 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
             gwlist_destroy(pdulist, NULL);
             octstr_destroy(msgid);
             gwlist_destroy(parts, octstr_destroy_item);
+            dict_destroy(metadata);
             return NULL;
         } else {
             pos = octstr_search_char(msg->sms.dlr_url, '|', 0);
@@ -377,6 +382,7 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
                 gwlist_destroy(pdulist, NULL);
                 octstr_destroy(msgid);
                 gwlist_destroy(parts, octstr_destroy_item);
+                dict_destroy(metadata);
                 return NULL;
             }
         }
@@ -408,6 +414,15 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
                 dlr_status = octstr_imm("UNDELIV");
                 break;
         }
+
+        if(metadata != NULL) {
+            tmp_str = dict_get(metadata, octstr_imm("dlr_stat"));
+            if(octstr_len(tmp_str) && (octstr_compare(tmp_str, octstr_imm("EXPIRED")) == 0)) {
+                dlr_state = 3;
+                dlr_status = octstr_imm("EXPIRED");
+            }
+        }
+
 
         text = octstr_get_cstr(msg->sms.msgdata);
 
@@ -465,6 +480,10 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
                 pdu2->u.deliver_sm.message_state = dlr_state;
                 dict_destroy(pdu2->u.deliver_sm.tlv);
                 pdu2->u.deliver_sm.tlv = meta_data_get_values(msg->sms.meta_data, "smpp");
+                if(metadata != NULL) {
+                    pdu2->u.deliver_sm.network_error_code = octstr_duplicate(
+                            dict_get(metadata, octstr_imm("network_error_code")));
+                }
             }
             pdu2->u.deliver_sm.short_message = octstr_format("id:%S sub:001 dlvrd:%S submit date:%s done date:%s stat:%S err:%s text:%S", msgid2, dlvrd, submit_date_c_str, done_date_c_str, dlr_status, err, tmp_str);
             pdu2->u.deliver_sm.sm_length = octstr_len(pdu2->u.deliver_sm.short_message);
@@ -481,6 +500,7 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
         octstr_destroy(dlr_service);
         octstr_destroy(dlr_submit);
         octstr_destroy(dlr_url);
+        dict_destroy(metadata);
         return pdulist;
     } else {
         pdu->u.deliver_sm.short_message = octstr_duplicate(msg->sms.msgdata);
