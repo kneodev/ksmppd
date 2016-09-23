@@ -628,8 +628,8 @@ Msg *smpp_submit_sm_to_msg(SMPPEsme *smpp_esme, SMPP_PDU *pdu, long *reason)
     /* check source addr */
     if ((*reason = smpp_pdu_util_convert_addr(smpp_esme->system_id, pdu->u.submit_sm.source_addr, ton, npi, smpp_esme->alt_addr_charset)) != SMPP_ESME_ROK)
         goto error;
-    msg->sms.sender = pdu->u.submit_sm.source_addr;
-    pdu->u.submit_sm.source_addr = NULL;
+    msg->sms.sender = octstr_duplicate(pdu->u.submit_sm.source_addr);
+//    pdu->u.submit_sm.source_addr = NULL;
 
     /*
      * Follows SMPP spec. v3.4. issue 1.2
@@ -649,14 +649,14 @@ Msg *smpp_submit_sm_to_msg(SMPPEsme *smpp_esme, SMPP_PDU *pdu, long *reason)
     /* check destination addr */
     if ((*reason = smpp_pdu_util_convert_addr(smpp_esme->system_id, pdu->u.submit_sm.destination_addr, ton, npi, smpp_esme->alt_addr_charset)) != SMPP_ESME_ROK)
         goto error;
-    msg->sms.receiver = pdu->u.submit_sm.destination_addr;
-    pdu->u.submit_sm.destination_addr = NULL;
+    msg->sms.receiver = octstr_duplicate(pdu->u.submit_sm.destination_addr);
+//    pdu->u.submit_sm.destination_addr = NULL;
 
     /* SMSCs use service_type for billing information
      * According to SMPP v5.0 there is no 'billing_identification'
      * TLV in the submit_sm PDU optional TLVs. */
-    msg->sms.binfo = pdu->u.submit_sm.service_type;
-    pdu->u.submit_sm.service_type = NULL;
+    msg->sms.binfo = octstr_duplicate(pdu->u.submit_sm.service_type);
+//    pdu->u.submit_sm.service_type = NULL;
 
     if (pdu->u.submit_sm.esm_class & ESM_CLASS_SUBMIT_RPI)
         msg->sms.rpi = 1;
@@ -666,12 +666,12 @@ Msg *smpp_submit_sm_to_msg(SMPPEsme *smpp_esme, SMPP_PDU *pdu, long *reason)
      * Note: SMPP spec. v3.4. doesn't allow to send both: message_payload & short_message!
      */
     if (smpp_esme->version > 0x33 && pdu->u.submit_sm.sm_length == 0 && pdu->u.submit_sm.message_payload) {
-        msg->sms.msgdata = pdu->u.submit_sm.message_payload;
-        pdu->u.submit_sm.message_payload = NULL;
+        msg->sms.msgdata = octstr_duplicate(pdu->u.submit_sm.message_payload);
+//        pdu->u.submit_sm.message_payload = NULL;
     }
     else {
-        msg->sms.msgdata = pdu->u.submit_sm.short_message;
-        pdu->u.submit_sm.short_message = NULL;
+        msg->sms.msgdata = octstr_duplicate(pdu->u.submit_sm.short_message);
+//        pdu->u.submit_sm.short_message = NULL;
     }
 
     /* check sar_msg_ref_num, sar_segment_seqnum, sar_total_segments */
