@@ -271,20 +271,22 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
     pdu->u.deliver_sm.source_addr_ton = GSM_ADDR_TON_NATIONAL; /* national */
     pdu->u.deliver_sm.source_addr_npi = GSM_ADDR_NPI_E164; /* ISDN number plan */
 
-    /* lets see if its international or alphanumeric sender */
-    if (octstr_get_char(pdu->u.deliver_sm.source_addr, 0) == '+') {
-        if (!octstr_check_range(pdu->u.deliver_sm.source_addr, 1, 256, gw_isdigit)) {
-            pdu->u.deliver_sm.source_addr_ton = GSM_ADDR_TON_ALPHANUMERIC; /* alphanum */
-            pdu->u.deliver_sm.source_addr_npi = GSM_ADDR_NPI_UNKNOWN; /* short code */
+    if(octstr_len(pdu->u.deliver_sm.source_addr)) {
+        /* lets see if its international or alphanumeric sender */
+        if (octstr_get_char(pdu->u.deliver_sm.source_addr, 0) == '+') {
+            if (!octstr_check_range(pdu->u.deliver_sm.source_addr, 1, 256, gw_isdigit)) {
+                pdu->u.deliver_sm.source_addr_ton = GSM_ADDR_TON_ALPHANUMERIC; /* alphanum */
+                pdu->u.deliver_sm.source_addr_npi = GSM_ADDR_NPI_UNKNOWN; /* short code */
+            } else {
+                /* numeric sender address with + in front -> international (remove the +) */
+                octstr_delete(pdu->u.deliver_sm.source_addr, 0, 1);
+                pdu->u.deliver_sm.source_addr_ton = GSM_ADDR_TON_INTERNATIONAL;
+            }
         } else {
-            /* numeric sender address with + in front -> international (remove the +) */
-            octstr_delete(pdu->u.deliver_sm.source_addr, 0, 1);
-            pdu->u.deliver_sm.source_addr_ton = GSM_ADDR_TON_INTERNATIONAL;
-        }
-    } else {
-        if (!octstr_check_range(pdu->u.deliver_sm.source_addr, 0, 256, gw_isdigit)) {
-            pdu->u.deliver_sm.source_addr_ton = GSM_ADDR_TON_ALPHANUMERIC;
-            pdu->u.deliver_sm.source_addr_npi = GSM_ADDR_NPI_UNKNOWN;
+            if (!octstr_check_range(pdu->u.deliver_sm.source_addr, 0, 256, gw_isdigit)) {
+                pdu->u.deliver_sm.source_addr_ton = GSM_ADDR_TON_ALPHANUMERIC;
+                pdu->u.deliver_sm.source_addr_npi = GSM_ADDR_NPI_UNKNOWN;
+            }
         }
     }
 
@@ -295,13 +297,14 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
      * if its a international number starting with +, lets remove the
      * '+' and set number type to international instead
      */
-    if (octstr_get_char(pdu->u.deliver_sm.destination_addr, 0) == '+') {
+    if (octstr_len(pdu->u.deliver_sm.destination_addr) && octstr_get_char(pdu->u.deliver_sm.destination_addr, 0) == '+') {
         octstr_delete(pdu->u.deliver_sm.destination_addr, 0, 1);
         pdu->u.deliver_sm.dest_addr_ton = GSM_ADDR_TON_INTERNATIONAL;
     }
 
     /* check length of src/dst address */
-    if (octstr_len(pdu->u.deliver_sm.destination_addr) > 20 ||
+    if (octstr_len(pdu->u.deliver_sm.destination_addr) <= 0 ||
+        octstr_len(pdu->u.deliver_sm.destination_addr) > 20 ||
             octstr_len(pdu->u.deliver_sm.source_addr) > 20) {
         smpp_pdu_destroy(pdu);
         gwlist_destroy(pdulist, NULL);
