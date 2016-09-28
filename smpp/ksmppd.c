@@ -97,6 +97,9 @@ static void signal_handler(int signum) {
 
         case SIGUSR2:
             warning(0, "SIGUSR2 received, catching and re-opening logs");
+            log_reopen();
+            alog_reopen();
+            break;
         case SIGHUP:
             warning(0, "SIGHUP received, catching and re-opening logs");
             log_reopen();
