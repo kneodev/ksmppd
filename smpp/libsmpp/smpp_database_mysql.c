@@ -61,6 +61,7 @@
  */ 
 
 #include <ctype.h>
+#include <gw/sms.h>
 #include "gwlib/gwlib.h"
 #include "gwlib/dbpool.h"
 #include "gw/msg.h"
@@ -387,6 +388,10 @@ List *smpp_database_mysql_get_stored(SMPPServer *smpp_server, long sms_type, Oct
 #include "gw/msg-decl.h"
                 default:
                     return NULL;
+            }
+
+            if(msg->sms.msgdata == NULL) {
+                msg->sms.msgdata = octstr_create("");
             }
             
             smpp_database_msg->msg = msg;
