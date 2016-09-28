@@ -82,6 +82,7 @@ extern "C" {
         RWLock *lock;
         SMPPServer *smpp_server;
         Dict *pending_requeues;
+        long requeue_thread_id;
     } SMPPBearerboxState;
 
     typedef struct {

@@ -72,6 +72,7 @@ extern "C" {
         Msg *msg;
         unsigned long global_id;
         SMPPServer *smpp_server;
+        long wakeup_thread_id;
     } SMPPDatabaseMsg;
     
     

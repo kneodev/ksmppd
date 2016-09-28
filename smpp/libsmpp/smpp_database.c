@@ -77,6 +77,7 @@ SMPPDatabaseMsg *smpp_database_msg_create() {
     SMPPDatabaseMsg *smpp_database_msg = gw_malloc(sizeof(SMPPDatabaseMsg));
     smpp_database_msg->global_id = 0;
     smpp_database_msg->msg = NULL;
+    smpp_database_msg->wakeup_thread_id = 0;
     return smpp_database_msg;
 }
 
