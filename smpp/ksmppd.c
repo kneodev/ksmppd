@@ -133,6 +133,7 @@ static void setup_signal_handlers(void) {
     sigaction(SIGQUIT, &act, NULL);
     sigaction(SIGHUP, &act, NULL);
     sigaction(SIGPIPE, &act, NULL);
+    sigaction(SIGUSR2, &act, NULL);
 //    sigaction(SIGSEGV, &act, NULL);
 }
 
