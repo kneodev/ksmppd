@@ -87,6 +87,7 @@ static int smpp_listener_read_pdu(SMPPEsme *smpp_esme, long *len, SMPP_PDU **pdu
         if (*len == -1) {
             error(0, "SMPP[%s:%ld]: Client sent garbage, ignored.",
                   octstr_get_cstr(smpp_esme->system_id), smpp_esme->id);
+            *len = 0;
             return -2;
         } else if (*len == 0) {
             if (conn_eof(conn) || conn_error(conn))
