@@ -179,6 +179,11 @@ SMPPEsmeGlobal *smpp_esme_global_create() {
     smpp_esme_global->outbound_processed = counter_create();
     smpp_esme_global->max_binds = 0;
     smpp_esme_global->enable_prepaid_billing = 0;
+    
+    smpp_esme_global->mo_counter = counter_create();
+    smpp_esme_global->mt_counter = counter_create();
+    smpp_esme_global->dlr_counter = counter_create();
+    smpp_esme_global->error_counter = counter_create();
 
     return smpp_esme_global;
 }
@@ -190,6 +195,10 @@ void smpp_esme_global_destroy(SMPPEsmeGlobal *smpp_esme_global) {
     counter_destroy(smpp_esme_global->inbound_processed);
     counter_destroy(smpp_esme_global->outbound_processed);
     octstr_destroy(smpp_esme_global->system_id);
+    counter_destroy(smpp_esme_global->mo_counter);
+    counter_destroy(smpp_esme_global->mt_counter);
+    counter_destroy(smpp_esme_global->dlr_counter);
+    counter_destroy(smpp_esme_global->error_counter);
     gw_free(smpp_esme_global);
 }
 
@@ -474,11 +483,25 @@ void smpp_esme_cleanup_thread(void *arg) {
     long timediff;
 
     int alive;
+    
+    double current_inbound_load = 0, current_outbound_load = 0;
+    double max_inbound_load = 0, max_outbound_load = 0;
 
     debug("smpp.esme.cleanup.thread", 0, "ESME cleanup thread starting");
     while (!(smpp_server->server_status & SMPP_SERVER_STATUS_SHUTDOWN)) {
         smpp_esme_data = smpp_server->esme_data;
-        info(0, "Current SMPP load is %f/sec inbound %f/sec outbound", load_get(smpp_esme_data->inbound_load, 0), load_get(smpp_esme_data->outbound_load, 0));
+        
+        current_inbound_load = load_get(smpp_esme_data->inbound_load, 1);
+        current_outbound_load = load_get(smpp_esme_data->outbound_load, 1);
+        if(current_inbound_load > max_inbound_load) {
+            max_inbound_load = current_inbound_load;
+            info(0, "New maximum inbound load: %f/sec", max_inbound_load);
+        }
+        if(current_outbound_load > max_outbound_load) {
+            max_outbound_load = current_outbound_load;
+            info(0, "New maximum outbound load: %f/sec", max_outbound_load);
+        }
+        info(0, "Current SMPP load is %f/sec inbound %f/sec outbound", current_inbound_load, current_outbound_load);
         gw_rwlock_wrlock(smpp_esme_data->lock);
         keys = dict_keys(smpp_esme_data->esmes);
 
@@ -706,29 +729,36 @@ SMPPHTTPCommandResult *smpp_esme_status_command(SMPPServer *smpp_server, List *c
             smpp_esme_global = dict_get(smpp_esme_data->esmes, key);
             num = gwlist_len(smpp_esme_global->binds);
             
-            octstr_format_append(smpp_http_command_result->result, "\n%S - binds:%ld/%ld, total inbound load:(%0.2f/%0.2f/%0.2f)/%0.2f/sec, outbound load:(%0.2f/%0.2f/%0.2f)/sec\n", 
+            octstr_format_append(smpp_http_command_result->result, "\n%S - binds:%ld/%ld, total inbound load:(%0.2f/%0.2f/%0.2f)/%0.2f/sec, outbound load:(%0.2f/%0.2f/%0.2f)/sec, mt/mo/dlr/errors:(%ld/%ld/%ld/%ld)\n", 
                     key, num, 
                     smpp_esme_global->max_binds, 
                     load_get(smpp_esme_global->inbound_load, 0), load_get(smpp_esme_global->inbound_load, 1), load_get(smpp_esme_global->inbound_load, 2), 
                     smpp_esme_global->throughput, 
-                    load_get(smpp_esme_global->outbound_load, 0),load_get(smpp_esme_global->outbound_load, 1),load_get(smpp_esme_global->outbound_load, 2));
+                    load_get(smpp_esme_global->outbound_load, 0),load_get(smpp_esme_global->outbound_load, 1),load_get(smpp_esme_global->outbound_load, 2),
+                    counter_value(smpp_esme_global->mt_counter), counter_value(smpp_esme_global->mo_counter), counter_value(smpp_esme_global->dlr_counter), counter_value(smpp_esme_global->error_counter)
+                    );
             
             for(i=0;i<num;i++) {
                 //smpp_http_result->result = octstr_format("Uptime %ldd %ldh %ldm %lds\n", diff/3600/24, diff/3600%24, diff/60%60, diff%60);
                 
                 smpp_esme = gwlist_get(smpp_esme_global->binds, i);
                 timediff = time(NULL) - smpp_esme->time_connected;
-                octstr_format_append(smpp_http_command_result->result, "-- id:%ld uptime:%ldd %ldh %ldm %lds, "
+                octstr_format_append(smpp_http_command_result->result, "-- id:%ld ip:%S uptime:%ldd %ldh %ldm %lds, "
                         "type:%d, "
                         "open-acks:%ld, "
+                        "simulate: %s, "
                         "inbound (load/queued/processed/routing):%0.2f/%ld/%ld/%ld, "
-                        "outbound (load/queued/processed):%0.2f/%ld/%ld\n",
+                        "outbound (load/queued/processed):%0.2f/%ld/%ld, "
+                        "mt/mo/dlr/errors:%ld/%ld/%ld/%ld\n",
                         smpp_esme->id,
+                        smpp_esme->ip,
                         timediff/3600/24, timediff/3600%24, timediff/60%60, timediff%60,
                         smpp_esme->bind_type,
                         dict_key_count(smpp_esme->open_acks),
+                        (smpp_esme->simulate ? "yes" : "no"),
                         load_get(smpp_esme->inbound_load, 0),counter_value(smpp_esme->inbound_queued),counter_value(smpp_esme->inbound_processed),counter_value(smpp_esme->pending_routing),
-                        load_get(smpp_esme->outbound_load, 0),counter_value(smpp_esme->outbound_queued),counter_value(smpp_esme->outbound_processed)
+                        load_get(smpp_esme->outbound_load, 0),counter_value(smpp_esme->outbound_queued),counter_value(smpp_esme->outbound_processed),
+                        counter_value(smpp_esme->mt_counter), counter_value(smpp_esme->mo_counter), counter_value(smpp_esme->dlr_counter), counter_value(smpp_esme->error_counter)
                         );
             }
             
@@ -754,20 +784,34 @@ SMPPHTTPCommandResult *smpp_esme_status_command(SMPPServer *smpp_server, List *c
             smpp_esme_global = dict_get(smpp_esme_data->esmes, key);
             num = gwlist_len(smpp_esme_global->binds);
             
-            octstr_format_append(smpp_http_command_result->result, "\n<esme>\n\t<system-id>%S</system-id>\n\t<bind-count>%ld</bind-count>\n\t<max-binds>%ld</max-binds>\n\t<inbound-load>%0.2f/%0.2f/%0.2f</inbound-load>\n\t<max-inbound-load>%0.2f</max-inbound-load>\n\t<outbound-load>%0.2f/%0.2f/%0.2f</outbound-load>\n", 
+            octstr_format_append(smpp_http_command_result->result, "\n<esme>\n"
+                    "\t<system-id>%S</system-id>\n"
+                    "\t<bind-count>%ld</bind-count>\n"
+                    "\t<max-binds>%ld</max-binds>\n"
+                    "\t<inbound-load>%0.2f/%0.2f/%0.2f</inbound-load>\n"
+                    "\t<max-inbound-load>%0.2f</max-inbound-load>\n"
+                    "\t<outbound-load>%0.2f/%0.2f/%0.2f</outbound-load>\n"
+                    "\t<mt>%ld</mt>\n"
+                    "\t<mo>%ld</mo>\n"
+                    "\t<dlr>%ld</dlr>\n"
+                    "\t<errors>%ld</dlr>\n", 
                     key, num, 
                     smpp_esme_global->max_binds, 
                     load_get(smpp_esme_global->inbound_load, 0), load_get(smpp_esme_global->inbound_load, 1), load_get(smpp_esme_global->inbound_load, 2), 
                     smpp_esme_global->throughput, 
-                    load_get(smpp_esme_global->outbound_load, 0),load_get(smpp_esme_global->outbound_load, 1),load_get(smpp_esme_global->outbound_load, 2));
+                    load_get(smpp_esme_global->outbound_load, 0),load_get(smpp_esme_global->outbound_load, 1),load_get(smpp_esme_global->outbound_load, 2),
+                    counter_value(smpp_esme_global->mt_counter), counter_value(smpp_esme_global->mo_counter), counter_value(smpp_esme_global->dlr_counter), counter_value(smpp_esme_global->error_counter)
+                    );
             
             for(i=0;i<num;i++) {
                 smpp_esme = gwlist_get(smpp_esme_global->binds, i);
                 timediff = time(NULL) - smpp_esme->time_connected;
                 octstr_format_append(smpp_http_command_result->result, "\t<bind>\n\t\t<bind-id>%ld</bind-id>\n"
+                        "\t\t<ip>%S</ip>\n"
                         "\t\t<uptime>%ld</uptime>\n"
                         "\t\t<bind-type>%d</bind-type>\n"
                         "\t\t<open-acks>%ld</open-acks>\n"
+                        "\t\t<simulate>%s</simulate>\n" 
                         "\t\t<inbound-load>%0.2f</inbound-load>\n"
                         "\t\t<inbound-queued>%ld</inbound-queued>\n"
                         "\t\t<inbound-processed>%ld</inbound-processed>\n"
@@ -775,13 +819,20 @@ SMPPHTTPCommandResult *smpp_esme_status_command(SMPPServer *smpp_server, List *c
                         "\t\t<outbound-load>%0.2f</outbound-load>\n"
                         "\t\t<outbound-queued>%ld</outbound-queued>\n"
                         "\t\t<outbound-processed>%ld</outbound-processed>\n"
+                        "\t\t<mt>%ld</mt>\n"
+                        "\t\t<mo>%ld</mo>\n"
+                        "\t\t<dlr>%ld</dlr>\n"
+                        "\t\t<dlr>%ld</dlr>\n"
                         "\t</bind>\n",
                         smpp_esme->id,
+                        smpp_esme->ip,
                         timediff,
                         smpp_esme->bind_type,
                         dict_key_count(smpp_esme->open_acks),
+                        (smpp_esme->simulate ? "yes" : "no"),
                         load_get(smpp_esme->inbound_load, 0),counter_value(smpp_esme->inbound_queued),counter_value(smpp_esme->inbound_processed),counter_value(smpp_esme->pending_routing),
-                        load_get(smpp_esme->outbound_load, 0),counter_value(smpp_esme->outbound_queued),counter_value(smpp_esme->outbound_processed)
+                        load_get(smpp_esme->outbound_load, 0),counter_value(smpp_esme->outbound_queued),counter_value(smpp_esme->outbound_processed),
+                        counter_value(smpp_esme->mt_counter), counter_value(smpp_esme->mo_counter), counter_value(smpp_esme->dlr_counter), counter_value(smpp_esme->error_counter)
                         );
             }
             
@@ -949,6 +1000,11 @@ SMPPEsme *smpp_esme_create() {
     smpp_esme->pending_routing = counter_create();
     smpp_esme->ip = NULL;
     
+    smpp_esme->mo_counter = counter_create();
+    smpp_esme->mt_counter = counter_create();
+    smpp_esme->dlr_counter = counter_create();
+    smpp_esme->error_counter = counter_create();
+    
     smpp_esme->pending_len = 0;
     
     return smpp_esme;
@@ -978,6 +1034,11 @@ void smpp_esme_destroy(SMPPEsme *smpp_esme) {
 
     counter_destroy(smpp_esme->catenated_sms_counter);
     counter_destroy(smpp_esme->sequence_number);
+    
+    counter_destroy(smpp_esme->mo_counter);
+    counter_destroy(smpp_esme->mt_counter);
+    counter_destroy(smpp_esme->dlr_counter);
+    counter_destroy(smpp_esme->error_counter);
     
     gw_rwlock_destroy(smpp_esme->event_lock);
     gw_rwlock_destroy(smpp_esme->ack_process_lock);

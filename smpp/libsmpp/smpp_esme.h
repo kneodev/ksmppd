@@ -95,6 +95,10 @@ extern "C" {
         Counter *inbound_processed;
         Counter *outbound_processed;
         int enable_prepaid_billing;
+        Counter *mt_counter;
+        Counter *mo_counter;
+        Counter *dlr_counter;
+        Counter *error_counter;
     } SMPPEsmeGlobal;
     
     
@@ -184,6 +188,11 @@ extern "C" {
         Octstr *ip;
         
         long pending_len;
+        
+        Counter *mt_counter;
+        Counter *mo_counter;
+        Counter *dlr_counter;
+        Counter *error_counter;
     } SMPPEsme;
     
     SMPPESMEAuthResult *smpp_esme_auth_result_create();

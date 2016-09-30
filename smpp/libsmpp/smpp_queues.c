@@ -145,6 +145,17 @@ void smpp_queues_callback_deliver_sm_resp(void *context, long status) {
     int destroy = 1;
     debug("smpp.queues.callback.deliver.sm.resp", 0, "SMPP[%s] Got deliver_sm callback status %ld %p", octstr_get_cstr(smpp_queued_pdu->system_id), status, smpp_queued_pdu);
     if((status == SMPP_ESME_ROK) || (status == SMPP_ESME_COMMAND_STATUS_QUEUED)) {
+        if(smpp_queued_pdu->pdu && (smpp_queued_pdu->pdu->type == deliver_sm)) {
+            if(smpp_queued_pdu->pdu->u.deliver_sm.esm_class & (0x04|0x08|0x20)) {
+                /* DLR */
+                counter_increase(smpp_queued_pdu->smpp_esme->dlr_counter);
+                counter_increase(smpp_queued_pdu->smpp_esme->smpp_esme_global->dlr_counter);
+            } else {
+                /* MO */
+                counter_increase(smpp_queued_pdu->smpp_esme->mo_counter);
+                counter_increase(smpp_queued_pdu->smpp_esme->smpp_esme_global->mo_counter);
+            }
+        }
         if((smpp_queued_pdu->bearerbox) && (smpp_queued_pdu->bearerbox_id)) {
             smpp_bearerbox_acknowledge(smpp_queued_pdu->bearerbox, smpp_queued_pdu->bearerbox_id, ack_success);
         } else if(smpp_queued_pdu->global_id > 0) {
@@ -172,11 +183,15 @@ void smpp_queues_callback_submit_sm(void *context, int status) {
     SMPPQueuedPDU *smpp_queued_response_pdu = context;
 
     if (status != SMPP_ESME_ROK) {
+        counter_increase(smpp_queued_response_pdu->smpp_esme->error_counter);
+        counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->error_counter);
         octstr_destroy(smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id);
         smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id = NULL;
         smpp_queued_response_pdu->pdu->u.submit_sm_resp.command_status = status;
         smpp_queues_add_outbound(smpp_queued_response_pdu);
     } else {
+        counter_increase(smpp_queued_response_pdu->smpp_esme->mt_counter);
+        counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->mt_counter);
         smpp_queued_response_pdu->pdu->u.submit_sm_resp.command_status = status;
         smpp_queues_add_outbound(smpp_queued_response_pdu);
     }
@@ -186,11 +201,15 @@ void smpp_queues_callback_data_sm(void *context, int status) {
     SMPPQueuedPDU *smpp_queued_response_pdu = context;
 
     if (status != SMPP_ESME_ROK) {
+        counter_increase(smpp_queued_response_pdu->smpp_esme->error_counter);
+        counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->error_counter);
         octstr_destroy(smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id);
         smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id = NULL;
         smpp_queued_response_pdu->pdu->u.data_sm_resp.command_status = status;
         smpp_queues_add_outbound(smpp_queued_response_pdu);
     } else {
+        counter_increase(smpp_queued_response_pdu->smpp_esme->mt_counter);
+        counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->mt_counter);
         smpp_queued_response_pdu->pdu->u.data_sm_resp.command_status = status;
         smpp_queues_add_outbound(smpp_queued_response_pdu);
     }
@@ -219,6 +238,8 @@ void smpp_queues_submit_routing_done(void *context, SMPPRouteStatus *smpp_route_
             
             smpp_bearerbox_add_message(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->msg, smpp_queues_callback_submit_sm, smpp_queued_response_pdu);
         } else {
+            counter_increase(smpp_queued_response_pdu->smpp_esme->error_counter);
+            counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->error_counter);
             warning(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f, but not enough credit", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);
             octstr_destroy(smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id);
             smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id = NULL;
@@ -240,6 +261,8 @@ void smpp_queues_submit_routing_done(void *context, SMPPRouteStatus *smpp_route_
                 
                 smpp_bearerbox_add_message(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->msg, smpp_queues_callback_submit_sm, smpp_queued_response_pdu);
             } else {
+                counter_increase(smpp_queued_response_pdu->smpp_esme->error_counter);
+                counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->error_counter);
                 warning(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f, but not enough credit", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);
                 octstr_destroy(smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id);
                 smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id = NULL;
@@ -249,6 +272,8 @@ void smpp_queues_submit_routing_done(void *context, SMPPRouteStatus *smpp_route_
                 smpp_queues_add_outbound(smpp_queued_response_pdu);
             }
         } else {
+            counter_increase(smpp_queued_response_pdu->smpp_esme->error_counter);
+            counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->error_counter);
             warning(0, "SMPP[%s] could not route message to %s, rejecting", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver));
             octstr_destroy(smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id);
             smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id = NULL;
@@ -270,6 +295,8 @@ void smpp_queues_data_sm_routing_done(void *context, SMPPRouteStatus *smpp_route
             info(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);
             smpp_bearerbox_add_message(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->msg, smpp_queues_callback_data_sm, smpp_queued_response_pdu);
         } else {
+            counter_increase(smpp_queued_response_pdu->smpp_esme->error_counter);
+            counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->error_counter);
             warning(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f, but not enough credit", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);
             octstr_destroy(smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id);
             smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id = NULL;
@@ -285,6 +312,8 @@ void smpp_queues_data_sm_routing_done(void *context, SMPPRouteStatus *smpp_route
                 info(0, "SMPP[%s] Using default routing for %s to %s for cost %f", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), smpp_queued_response_pdu->smpp_esme->default_cost);
                 smpp_bearerbox_add_message(smpp_queued_response_pdu->smpp_esme->smpp_server, smpp_queued_response_pdu->msg, smpp_queues_callback_data_sm, smpp_queued_response_pdu);
             } else {
+                counter_increase(smpp_queued_response_pdu->smpp_esme->error_counter);
+                counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->error_counter);
                 warning(0, "SMPP[%s] Successfully routed message for %s to %s for cost %f, but not enough credit", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.smsc_id), cost);
                 octstr_destroy(smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id);
                 smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id = NULL;
@@ -294,6 +323,8 @@ void smpp_queues_data_sm_routing_done(void *context, SMPPRouteStatus *smpp_route
                 smpp_queues_add_outbound(smpp_queued_response_pdu);
             }
         } else {
+            counter_increase(smpp_queued_response_pdu->smpp_esme->error_counter);
+            counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->error_counter);
             warning(0, "SMPP[%s] could not route message to %s, rejecting", octstr_get_cstr(smpp_queued_response_pdu->smpp_esme->system_id), octstr_get_cstr(smpp_queued_response_pdu->msg->sms.receiver));
             octstr_destroy(smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id);
             smpp_queued_response_pdu->pdu->u.data_sm_resp.message_id = NULL;
@@ -350,10 +381,14 @@ void smpp_queues_handle_submit_sm(SMPPQueuedPDU *smpp_queued_pdu) {
         unsigned long simulation_count = counter_value(smpp_esme->inbound_processed);
 
         if (smpp_esme->simulate_temporary_failure_every && ((simulation_count % smpp_esme->simulate_temporary_failure_every) == 0)) {
+            counter_increase(smpp_queued_response_pdu->smpp_esme->error_counter);
+            counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->error_counter);
             debug("smpp.queues.handle.submit.sm", 0, "SMPP[%s:%ld] Simulating temporary failure", octstr_get_cstr(smpp_esme->system_id), smpp_esme->id);
             smpp_queued_response_pdu->pdu->u.submit_sm_resp.command_status = SMPP_ESME_RMSGQFUL;
             smpp_queues_add_outbound(smpp_queued_response_pdu);
         } else if (smpp_esme->simulate_permanent_failure_every && ((simulation_count % smpp_esme->simulate_permanent_failure_every) == 0)) {
+            counter_increase(smpp_queued_response_pdu->smpp_esme->error_counter);
+            counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->error_counter);
             debug("smpp.queues.handle.submit.sm", 0, "SMPP[%s:%ld] Simulating permanent failure", octstr_get_cstr(smpp_esme->system_id), smpp_esme->id);
             smpp_queued_response_pdu->pdu->u.submit_sm_resp.command_status = SMPP_ESME_RSUBMITFAIL;
             smpp_queues_add_outbound(smpp_queued_response_pdu);
@@ -365,6 +400,8 @@ void smpp_queues_handle_submit_sm(SMPPQueuedPDU *smpp_queued_pdu) {
                 error(0, "Error converting to PDU %ld", error_reason);
                 smpp_queues_add_outbound(smpp_queued_response_pdu);
             } else {
+                counter_increase(smpp_queued_response_pdu->smpp_esme->mt_counter);
+                counter_increase(smpp_queued_response_pdu->smpp_esme->smpp_esme_global->mt_counter);
                 smpp_queued_response_pdu->pdu->u.submit_sm_resp.command_status = SMPP_ESME_ROK;
                 smpp_queued_response_pdu->pdu->u.submit_sm_resp.message_id = smpp_uuid_get(msg->sms.id);
                 
