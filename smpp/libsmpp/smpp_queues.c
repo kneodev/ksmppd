@@ -607,6 +607,7 @@ void smpp_queues_handle_bind_pdu(SMPPQueuedPDU *smpp_queued_pdu) {
                 smpp_queued_pdu->smpp_esme->version = smpp_queued_pdu->pdu->u.bind_transmitter.interface_version;
                 smpp_queued_response_pdu->pdu->u.bind_transmitter_resp.command_status = SMPP_ESME_ROK;
                 smpp_queued_response_pdu->pdu->u.bind_transmitter_resp.system_id = octstr_duplicate(smpp_queued_pdu->smpp_esme->smpp_server->server_id);
+                smpp_esme_global_add(smpp_queued_pdu->smpp_esme->smpp_server, smpp_queued_pdu->smpp_esme);
             }
 
             smpp_queues_add_outbound(smpp_queued_response_pdu);
@@ -627,6 +628,7 @@ void smpp_queues_handle_bind_pdu(SMPPQueuedPDU *smpp_queued_pdu) {
                 smpp_queued_pdu->smpp_esme->version = smpp_queued_pdu->pdu->u.bind_transceiver.interface_version;
                 smpp_queued_response_pdu->pdu->u.bind_transceiver_resp.command_status = SMPP_ESME_ROK;
                 smpp_queued_response_pdu->pdu->u.bind_transceiver_resp.system_id = octstr_duplicate(smpp_queued_pdu->smpp_esme->smpp_server->server_id);
+                smpp_esme_global_add(smpp_queued_pdu->smpp_esme->smpp_server, smpp_queued_pdu->smpp_esme);
             }
 
             smpp_queues_add_outbound(smpp_queued_response_pdu);
@@ -647,6 +649,7 @@ void smpp_queues_handle_bind_pdu(SMPPQueuedPDU *smpp_queued_pdu) {
                 smpp_queued_pdu->smpp_esme->system_id = octstr_duplicate(smpp_queued_pdu->pdu->u.bind_receiver.system_id);
                 smpp_queued_response_pdu->pdu->u.bind_receiver_resp.command_status = SMPP_ESME_ROK;
                 smpp_queued_response_pdu->pdu->u.bind_receiver_resp.system_id = octstr_duplicate(smpp_queued_pdu->smpp_esme->smpp_server->server_id);
+                smpp_esme_global_add(smpp_queued_pdu->smpp_esme->smpp_server, smpp_queued_pdu->smpp_esme);
             }
 
             smpp_queues_add_outbound(smpp_queued_response_pdu);
@@ -681,7 +684,6 @@ void smpp_queues_handle_bind_pdu(SMPPQueuedPDU *smpp_queued_pdu) {
             smpp_queued_pdu->smpp_esme->simulate_temporary_failure_every = auth_result->simulate_temporary_failure_every;
             smpp_queued_pdu->smpp_esme->simulate_mo_every = auth_result->simulate_mo_every;
         }
-        smpp_esme_global_add(smpp_queued_pdu->smpp_esme->smpp_server, smpp_queued_pdu->smpp_esme);
         smpp_queued_pdu->smpp_esme->smpp_esme_global->throughput = auth_result->throughput;
         smpp_queued_pdu->smpp_esme->smpp_esme_global->max_binds = auth_result->max_binds;
         smpp_queued_pdu->smpp_esme->smpp_esme_global->enable_prepaid_billing = auth_result->enable_prepaid_billing;
