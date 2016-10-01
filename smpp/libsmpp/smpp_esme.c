@@ -409,6 +409,11 @@ SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, O
         }
         gw_rwlock_unlock(smpp_esme_data->lock);
     }
+
+    if(!smpp_auth_result) {
+        smpp_listener_auth_failed(smpp_server, smpp_esme->ip);
+    }
+
     return smpp_auth_result;
 }
 

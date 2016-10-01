@@ -73,6 +73,65 @@
 #include <errno.h>
 #include <event2/listener.h>
 
+ typedef struct {
+    Octstr *ip;
+    long time_blocked;
+    long attempts;
+ } SMPPBlockedIp;
+
+ SMPPBlockedIp *smpp_blocked_ip_create() {
+    SMPPBlockedIp *smpp_blocked_ip = gw_malloc(sizeof(SMPPBlockedIp));
+    smpp_blocked_ip->ip = NULL;
+    smpp_blocked_ip->time_blocked = 0;
+    smpp_blocked_ip->attempts = 0;
+
+    return smpp_blocked_ip;
+ }
+
+ void smpp_blocked_ip_destroy(SMPPBlockedIp *smpp_blocked_ip) {
+    octstr_destroy(smpp_blocked_ip->ip);
+    gw_free(smpp_blocked_ip);
+ }
+
+ void smpp_listener_auth_failed(SMPPServer *smpp_server, Octstr *ip) {
+    gw_rwlock_wrlock(smpp_server->ip_blocklist_lock);
+    SMPPBlockedIp *smpp_blocked_ip = dict_get(smpp_server->ip_blocklist, ip);
+    if(smpp_blocked_ip == NULL) {
+        smpp_blocked_ip = smpp_blocked_ip_create();
+        dict_put(smpp_server->ip_blocklist, ip, smpp_blocked_ip);
+    }
+    smpp_blocked_ip->attempts++;
+    smpp_blocked_ip->time_blocked = time(NULL);
+    gw_rwlock_unlock(smpp_server->ip_blocklist_lock);
+ }
+
+ int smpp_listener_ip_is_blocked(SMPPServer *smpp_server, Octstr *ip) {
+    int result = 0;
+    long diff;
+    gw_rwlock_wrlock(smpp_server->ip_blocklist_lock);
+    SMPPBlockedIp *smpp_blocked_ip = dict_get(smpp_server->ip_blocklist, ip);
+    if(smpp_blocked_ip != NULL) {
+        diff = time(NULL) - smpp_blocked_ip->time_blocked;
+        if(diff > smpp_server->ip_blocklist_time) {
+            debug("smpp.listener.ip.is.blocked", 0, "IP address %s is now unblocked", octstr_get_cstr(ip));
+            /* Time has elapsed, can reset (unblock) */
+            smpp_blocked_ip->time_blocked = 0;
+            smpp_blocked_ip->attempts = 0;
+        } else {
+            /* Time has not elapsed, how many attempts have they had? */
+            if(smpp_blocked_ip->attempts >= smpp_server->ip_blocklist_attempts) {
+                result = 1;
+                /* Still blocked */
+                debug("smpp.listener.ip.is.blocked", 0, "IP address %s is blocked for another %ld seconds", octstr_get_cstr(ip), diff);
+            }
+        }
+    } else {
+        /* Not blocked */
+    }
+    gw_rwlock_unlock(smpp_server->ip_blocklist_lock);
+    return result;
+ }
+
 /* Copied from Kannel smsc_smpp.c */
 static int smpp_listener_read_pdu(SMPPEsme *smpp_esme, long *len, SMPP_PDU **pdu)
 {
@@ -186,10 +245,17 @@ static void smpp_listener_connection_callback(struct evconnlistener *listener, e
         struct sockaddr_in *sin = (struct sockaddr_in *) address;
         ip = host_ip(*sin);
     }
-    
-    
-    
+
     debug("smpp.listener.connection.callback", 0, "Got connection from %s", octstr_get_cstr(ip));
+
+    if(octstr_len(ip)) {
+        if(smpp_listener_ip_is_blocked(smpp_server, ip)) {
+            warning(0, "%s is temporarily banned from connecting. Rejecting.", octstr_get_cstr(ip));
+            evutil_closesocket(fd);
+            octstr_destroy(ip);
+            return;
+        }
+    }
     
     struct event *event_container;
     
@@ -251,7 +317,10 @@ int smpp_listener_start(SMPPServer *smpp_server) {
         panic(0,"Couldn't create listener");
         return 1;
     }
-    
+
+
+    smpp_server->ip_blocklist = dict_create(512, (void(*)(void *))smpp_blocked_ip_destroy);
+
     smpp_bearerbox_init(smpp_server);
     smpp_esme_init(smpp_server);
     smpp_queues_init(smpp_server);
@@ -266,6 +335,8 @@ int smpp_listener_start(SMPPServer *smpp_server) {
     smpp_queues_shutdown(smpp_server);
     smpp_esme_shutdown(smpp_server);
     smpp_bearerbox_shutdown(smpp_server);
+
+    dict_destroy(smpp_server->ip_blocklist);
     
     evconnlistener_free(smpp_server->event_listener);
     

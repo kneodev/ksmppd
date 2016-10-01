@@ -139,6 +139,11 @@ extern "C" {
         
         
         Dict *plugins;
+
+        Dict *ip_blocklist;
+        RWLock *ip_blocklist_lock;
+        long ip_blocklist_time;
+        long ip_blocklist_attempts;
     } SMPPServer;
     
     SMPPServer *smpp_server_create();

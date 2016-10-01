@@ -102,6 +102,9 @@ SMPPServer *smpp_server_create() {
     smpp_server->plugin_auth = NULL;
     smpp_server->plugin_route = NULL;
     smpp_server->plugins = dict_create(8, (void(*)(void *))smpp_plugin_destroy);
+    smpp_server->ip_blocklist = NULL;
+    smpp_server->ip_blocklist_lock = gw_rwlock_create();
+    smpp_server->ip_blocklist_time = 0;
 
     return smpp_server;
 }
@@ -126,6 +129,7 @@ void smpp_server_destroy(SMPPServer *smpp_server) {
     counter_destroy(smpp_server->esme_counter);
     counter_destroy(smpp_server->running_threads);
     octstr_destroy(smpp_server->auth_url);
+    gw_rwlock_destroy(smpp_server->ip_blocklist_lock);
     
     cfg_destroy(smpp_server->running_configuration);
     
@@ -195,6 +199,16 @@ int smpp_server_reconfigure(SMPPServer *smpp_server) {
                 if(cfg_get_integer(&smpp_server->num_outbound_queue_threads, grp, octstr_imm("outbound-queue-threads")) == -1) {
                     smpp_server->num_outbound_queue_threads = 1;
                 }
+
+                if(cfg_get_integer(&smpp_server->ip_blocklist_time, grp, octstr_imm("ip-blocklist-time")) == -1) {
+                    smpp_server->ip_blocklist_time = 300;
+                }
+
+                if(cfg_get_integer(&smpp_server->ip_blocklist_attempts, grp, octstr_imm("ip-blocklist-attempts")) == -1) {
+                    smpp_server->ip_blocklist_attempts = 5;
+                }
+
+                debug("smpp", 0, "Blocking users for %ld seconds on %ld authentication failures", smpp_server->ip_blocklist_time, smpp_server->ip_blocklist_attempts);
 
                 smpp_server->database_type = cfg_get(grp, octstr_imm("database-type"));
                 smpp_server->database_config = cfg_get(grp, octstr_imm("database-config"));
