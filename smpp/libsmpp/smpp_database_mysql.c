@@ -231,6 +231,41 @@ List *smpp_database_mysql_get_stored_pdu(SMPPServer *smpp_server,  Octstr *servi
     return messages;
 }
 
+List *smpp_database_mysql_get_esmes_with_queued(SMPPServer *smpp_server) {
+    SMPPDatabase *smpp_database = smpp_server->database;
+    DBPool *pool = smpp_database->context;
+    Octstr *sql, *system_id;
+
+    List *esmes = gwlist_create();
+    List *results = NULL;
+    List *row;
+
+    DBPoolConn *conn;
+
+    sql = octstr_format("SELECT LOWER(system_id) FROM %S UNION DISTINCT SELECT LOWER(service) FROM %S", smpp_server->database_pdu_table, smpp_server->database_store_table);
+
+    conn = dbpool_conn_consume(pool);
+
+    dbpool_conn_select(conn, sql, NULL, &results);
+
+    octstr_destroy(sql);
+
+    dbpool_conn_produce(conn);
+
+    if (gwlist_len(results) > 0) {
+        while ((row = gwlist_extract_first(results)) != NULL) {
+            system_id = gwlist_get(row, 0);
+            debug("smpp.database.mysql.get.esmes.with.queued", 0, "ESME %s has queued messages in store ", octstr_get_cstr(system_id));
+            gwlist_produce(esmes, system_id);
+            gwlist_destroy(row, NULL);
+        }
+    }
+
+    gwlist_destroy(results, NULL);
+
+    return esmes;
+}
+
 List *smpp_database_mysql_get_routes(SMPPServer *smpp_server, int direction, Octstr *service) {
     SMPPDatabase *smpp_database = smpp_server->database;
     DBPool *pool = smpp_database->context;
@@ -954,6 +989,7 @@ found:
     smpp_database->get_routes = smpp_database_mysql_get_routes;
     smpp_database->shutdown = smpp_database_mysql_shutdown;
     smpp_database->deduct_credit = smpp_database_mysql_deduct_credit;
+    smpp_database->get_esmes_with_queued = smpp_database_mysql_get_esmes_with_queued;
     smpp_database->context = pool;
     smpp_database->pending_pdu = dict_create(1024, NULL);
     smpp_database->pending_msg = dict_create(1024, NULL);

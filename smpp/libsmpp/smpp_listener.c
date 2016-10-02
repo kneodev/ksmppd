@@ -107,7 +107,7 @@
 
  int smpp_listener_ip_is_blocked(SMPPServer *smpp_server, Octstr *ip) {
     int result = 0;
-    long diff;
+    long diff, remaining;
     gw_rwlock_wrlock(smpp_server->ip_blocklist_lock);
     SMPPBlockedIp *smpp_blocked_ip = dict_get(smpp_server->ip_blocklist, ip);
     if(smpp_blocked_ip != NULL) {
@@ -122,7 +122,8 @@
             if(smpp_blocked_ip->attempts >= smpp_server->ip_blocklist_attempts) {
                 result = 1;
                 /* Still blocked */
-                debug("smpp.listener.ip.is.blocked", 0, "IP address %s is blocked for another %ld seconds", octstr_get_cstr(ip), diff);
+                remaining = smpp_server->ip_blocklist_time - diff;
+                debug("smpp.listener.ip.is.blocked", 0, "IP address %s is blocked for another %ld seconds", octstr_get_cstr(ip), remaining);
             }
         }
     } else {
@@ -250,7 +251,7 @@ static void smpp_listener_connection_callback(struct evconnlistener *listener, e
 
     if(octstr_len(ip)) {
         if(smpp_listener_ip_is_blocked(smpp_server, ip)) {
-            warning(0, "%s is temporarily banned from connecting. Rejecting.", octstr_get_cstr(ip));
+            debug("smpp.listener.connection.callback", 0, "%s is temporarily banned from connecting. Rejecting.", octstr_get_cstr(ip));
             evutil_closesocket(fd);
             octstr_destroy(ip);
             return;

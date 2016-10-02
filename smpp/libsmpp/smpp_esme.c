@@ -202,15 +202,49 @@ void smpp_esme_global_destroy(SMPPEsmeGlobal *smpp_esme_global) {
     gw_free(smpp_esme_global);
 }
 
+static int smpp_esme_matches(void *a, void *b) {
+    if(octstr_case_compare(a, b) == 0) {
+        return 1;
+    }
+    return 0;
+}
+
 /* The caller of this function MUST lock smpp_esme_data->lock, 
  * otherwise there is a risk of results being destroyed before you can process them */
 List *smpp_esme_global_get_readers(SMPPServer *smpp_server, int best_only) {
     SMPPEsmeData *smpp_esme_data = smpp_server->esme_data;
     List *receiver_smpp_esmes = gwlist_create();
-    
-    List *keys = dict_keys(smpp_esme_data->esmes);
-    long num = gwlist_len(keys);
-    long i, limit, j, num_binds;
+    List *esmes_with_queued = NULL;
+    List *keys = NULL, *actual_keys = NULL;
+
+    Octstr *system_id;
+
+    long num, i;
+
+    if(smpp_server->database_enable_queue) {
+        esmes_with_queued = smpp_database_get_esmes_with_queued(smpp_server);
+        num = gwlist_len(esmes_with_queued);
+        keys = dict_keys(smpp_esme_data->esmes);
+        actual_keys = gwlist_create();
+        for(i=0;i<num;i++) {
+            system_id = gwlist_search(keys, gwlist_get(esmes_with_queued, i), smpp_esme_matches);
+            if(system_id) {
+                debug("smpp.esme.global.get.readers", 0, "SMPP[%s] has queued messages and receivers available", octstr_get_cstr(system_id));
+                gwlist_produce(actual_keys, octstr_duplicate(system_id));
+            } else {
+                debug("smpp.esme.global.get.readers", 0, "SMPP[%s] has queued messages but no receivers available", octstr_get_cstr(gwlist_get(esmes_with_queued, i)));
+            }
+        }
+        gwlist_destroy(keys, (void(*)(void *))octstr_destroy);
+        gwlist_destroy(esmes_with_queued, (void(*)(void *))octstr_destroy);
+
+        keys = actual_keys;
+    } else {
+        keys = dict_keys(smpp_esme_data->esmes);
+    }
+
+    num = gwlist_len(keys);
+    long limit, j, num_binds;
     SMPPEsmeGlobal *smpp_esme_global;
     SMPPEsme *smpp_esme;
     
@@ -249,6 +283,19 @@ void smpp_esme_db_queue_callback(void *context, long status) {
     SMPPServer *smpp_server = smpp_queued_pdu->smpp_server;
     info(0, "Got db msg queue callback for %ld status %ld", smpp_queued_pdu->sequence, status);
     if((status == SMPP_ESME_ROK) || (status == SMPP_ESME_COMMAND_STATUS_QUEUED)) {
+        if(status == SMPP_ESME_ROK) {
+            if(smpp_queued_pdu->smpp_esme && smpp_queued_pdu->pdu && (smpp_queued_pdu->pdu->type == deliver_sm)) {
+                if(smpp_queued_pdu->pdu->u.deliver_sm.esm_class & (0x04|0x08|0x20)) {
+                    /* DLR */
+                    counter_increase(smpp_queued_pdu->smpp_esme->dlr_counter);
+                    counter_increase(smpp_queued_pdu->smpp_esme->smpp_esme_global->dlr_counter);
+                } else {
+                    /* MO */
+                    counter_increase(smpp_queued_pdu->smpp_esme->mo_counter);
+                    counter_increase(smpp_queued_pdu->smpp_esme->smpp_esme_global->mo_counter);
+                }
+            }
+        }
         /* These SHOULD be the only two states if database queueing is active */
         smpp_database_remove(smpp_server, smpp_queued_pdu->sequence, 0);
     } else {

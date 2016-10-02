@@ -829,7 +829,8 @@ void smpp_queues_requeue_thread(void *arg) {
     
     Load *requeue_load = load_create_real(0);
     load_add_interval(requeue_load, 1);
-   
+
+    double current_load;
 
 
     while(!(smpp_server->server_status & SMPP_SERVER_STATUS_SHUTDOWN)) {
@@ -860,10 +861,14 @@ void smpp_queues_requeue_thread(void *arg) {
             }
         }
         gwlist_destroy(stored, NULL);
-        
-        
-        if(load_get(requeue_load, 0) < 1) { /* We don't want to wait a whole second before our next attempt, lets keep aggressively going while load is > 1/sec */
-            gwthread_sleep(1);
+
+        current_load = load_get(requeue_load, 0);
+
+        if(current_load < 1) { /* We don't want to wait a whole second before our next attempt, lets keep aggressively going while load is > 1/sec */
+            debug("smpp.queues.requeue.thread", 0, "Load was %f for requeue (not busy), waiting before next check", current_load);
+            gwthread_sleep(20);
+        } else {
+            debug("smpp.queues.requeue.thread", 0, "Load was %f for requeue (busy), checking immediately", current_load);
         }
     }
 

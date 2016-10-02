@@ -86,6 +86,7 @@ extern "C" {
         List *(*get_routes)(SMPPServer *context, int direction, Octstr *service);
         int (*deduct_credit)(SMPPServer *context, Octstr *service, double value);
         int (*delete)(SMPPServer *context, unsigned long global_id, int temporary);
+        List *(*get_esmes_with_queued)(SMPPServer *smpp_server);
         void (*shutdown)(SMPPServer *context);
         void *context;
         Dict *pending_pdu;
@@ -114,6 +115,7 @@ extern "C" {
     List *smpp_database_get_stored_pdu(SMPPServer *smpp_server, Octstr *service, long limit);
     List *smpp_database_get_routes(SMPPServer *smpp_server, int direction, Octstr *service);
     int smpp_database_deduct_credit(SMPPServer *smpp_server, Octstr *service, double value);
+    List *smpp_database_get_esmes_with_queued(SMPPServer *smpp_server);
     
     int smpp_database_remove(SMPPServer *smpp_server, unsigned long global_id, int temporary);
 
