@@ -221,19 +221,48 @@ List *smpp_esme_global_get_readers(SMPPServer *smpp_server, int best_only) {
 
     long num, i;
 
+    long limit, j, num_binds;
+    SMPPEsmeGlobal *smpp_esme_global;
+    SMPPEsme *smpp_esme;
+
+    Octstr *key;
+
+    int found = 0;
+
     if(smpp_server->database_enable_queue) {
         esmes_with_queued = smpp_database_get_esmes_with_queued(smpp_server);
         num = gwlist_len(esmes_with_queued);
         keys = dict_keys(smpp_esme_data->esmes);
         actual_keys = gwlist_create();
         for(i=0;i<num;i++) {
+            found = 0;
             system_id = gwlist_search(keys, gwlist_get(esmes_with_queued, i), smpp_esme_matches);
             if(system_id) {
-                debug("smpp.esme.global.get.readers", 0, "SMPP[%s] has queued messages and receivers available", octstr_get_cstr(system_id));
-                gwlist_produce(actual_keys, octstr_duplicate(system_id));
-            } else {
+                smpp_esme_global =  dict_get(smpp_esme_data->esmes, system_id);
+                if(smpp_esme_global) {
+                    num_binds = gwlist_len(smpp_esme_global->binds);
+                    for (j = 0; j < num_binds; j++) {
+                        smpp_esme = gwlist_get(smpp_esme_global->binds, j);
+                        if (smpp_esme->connected && (smpp_esme->bind_type & SMPP_ESME_RECEIVE)) {
+                            limit = smpp_esme->max_open_acks - dict_key_count(smpp_esme->open_acks);
+                            if (limit <= 0) {
+                                /* ESME has no space */
+                            } else {
+                                /* Found a capable receiver */
+                                debug("smpp.esme.global.get.readers", 0,
+                                      "SMPP[%s] has queued messages and receivers available", octstr_get_cstr(system_id));
+                                gwlist_produce(actual_keys, octstr_duplicate(system_id));
+                                found = 1;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if(!found) {
                 debug("smpp.esme.global.get.readers", 0, "SMPP[%s] has queued messages but no receivers available", octstr_get_cstr(gwlist_get(esmes_with_queued, i)));
             }
+
         }
         gwlist_destroy(keys, (void(*)(void *))octstr_destroy);
         gwlist_destroy(esmes_with_queued, (void(*)(void *))octstr_destroy);
@@ -244,11 +273,7 @@ List *smpp_esme_global_get_readers(SMPPServer *smpp_server, int best_only) {
     }
 
     num = gwlist_len(keys);
-    long limit, j, num_binds;
-    SMPPEsmeGlobal *smpp_esme_global;
-    SMPPEsme *smpp_esme;
-    
-    Octstr *key;
+
     
     for (i = 0; i < num; i++) {
         limit = SMPP_ESME_DEFAULT_MAX_OPEN_ACKS;

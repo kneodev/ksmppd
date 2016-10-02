@@ -143,10 +143,10 @@ void smpp_database_mysql_queued_pdu_handler(void *context, long status) {
     
     SMPPDatabase *smpp_database = smpp_queued_pdu->smpp_server->database;
     
-    if(status == SMPP_ESME_ROK) {
+    if((status != SMPP_QUEUED_PDU_DESTROYED) && (status != SMPP_ESME_COMMAND_STATUS_WAIT_ACK_TIMEOUT)) {
         /* Don't try again */
         smpp_database_mysql_remove_stored_pdu(smpp_queued_pdu->smpp_server, smpp_queued_pdu->bearerbox_id);   
-    }    
+    }
     
     dict_remove(smpp_database->pending_pdu, smpp_queued_pdu->bearerbox_id);
     smpp_queued_pdu_destroy(smpp_queued_pdu);
