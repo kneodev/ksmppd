@@ -92,6 +92,7 @@ static void signal_handler(int signum) {
                 error(0, "SIGINT received, aborting program...");
                 smpp_server_global->server_status |= SMPP_SERVER_STATUS_SHUTDOWN;
                 smpp_listener_shutdown(smpp_server_global);
+                gwthread_wakeup_all();
             }
             break;
 
