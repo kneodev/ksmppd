@@ -591,31 +591,6 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
     }
 
 
-    /*
-     * only re-encoding if using default smsc charset that is defined via
-     * alt-charset in smsc group and if MT is not binary
-     */
-    if (msg->sms.coding == DC_7BIT || (msg->sms.coding == DC_UNDEF && octstr_len(msg->sms.udhdata))) {
-        /* 
-         * consider 3 cases: 
-         *  a) data_coding 0xFX: encoding should always be GSM 03.38 charset 
-         *  b) data_coding 0x00: encoding may be converted according to alt-charset 
-         *  c) data_coding 0x00: assume GSM 03.38 charset if alt-charset is not defined
-         */
-        if ((pdu->u.deliver_sm.data_coding & 0xF0) ||
-                (!smpp_esme->alt_charset && pdu->u.deliver_sm.data_coding == 0)) {
-            charset_utf8_to_gsm(pdu->u.deliver_sm.short_message);
-        } else if (pdu->u.deliver_sm.data_coding == 0 && smpp_esme->alt_charset) {
-            /*
-             * convert to the given alternative charset
-             */
-            if (charset_convert(pdu->u.deliver_sm.short_message, BEARERBOX_DEFAULT_CHARSET,
-                    octstr_get_cstr(smpp_esme->alt_charset)) != 0)
-                error(0, "Failed to convert msgdata from charset <%s> to <%s>, will send as is.",
-                    BEARERBOX_DEFAULT_CHARSET, octstr_get_cstr(smpp_esme->alt_charset));
-        }
-    }
-
     /* prepend udh if present */
     if (octstr_len(msg->sms.udhdata)) {
         octstr_insert(pdu->u.deliver_sm.short_message, msg->sms.udhdata, 0);
@@ -667,6 +642,30 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
             pdu2->u.deliver_sm.short_message = octstr_cat(msg2->sms.udhdata, msg2->sms.msgdata);
         } else {
             pdu2->u.deliver_sm.short_message = octstr_duplicate(msg2->sms.msgdata);
+            /*
+             * only re-encoding if using default smsc charset that is defined via
+             * alt-charset in smsc group and if MT is not binary
+             */
+            if (msg->sms.coding == DC_7BIT || (msg->sms.coding == DC_UNDEF && octstr_len(msg->sms.udhdata))) {
+                /*
+                 * consider 3 cases:
+                 *  a) data_coding 0xFX: encoding should always be GSM 03.38 charset
+                 *  b) data_coding 0x00: encoding may be converted according to alt-charset
+                 *  c) data_coding 0x00: assume GSM 03.38 charset if alt-charset is not defined
+                 */
+                if ((pdu2->u.deliver_sm.data_coding & 0xF0) ||
+                    (!smpp_esme->alt_charset && pdu2->u.deliver_sm.data_coding == 0)) {
+                    charset_utf8_to_gsm(pdu2->u.deliver_sm.short_message);
+                } else if (pdu2->u.deliver_sm.data_coding == 0 && smpp_esme->alt_charset) {
+                    /*
+                     * convert to the given alternative charset
+                     */
+                    if (charset_convert(pdu2->u.deliver_sm.short_message, BEARERBOX_DEFAULT_CHARSET,
+                                        octstr_get_cstr(smpp_esme->alt_charset)) != 0)
+                        error(0, "Failed to convert msgdata from charset <%s> to <%s>, will send as is.",
+                              BEARERBOX_DEFAULT_CHARSET, octstr_get_cstr(smpp_esme->alt_charset));
+                }
+            }
         }
 
         pdu2->u.deliver_sm.sm_length = octstr_len(pdu2->u.deliver_sm.short_message);
