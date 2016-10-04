@@ -35,7 +35,7 @@ I'd also like to specifically thank the developer of OpenSMPPBox Rene Kluwen as 
 
 It makes extensive use of gwlib and other features developed for Kannel, it would not be possible without them.
 
-Special thanks to @donald-jackson for multiple contributions.
+Special thanks to [donald-jackson](https://github.com/donald-jackson) for multiple contributions.
 
 If you do wish to donate to this project, please do so via the bitcoin address below.
 
