@@ -27,6 +27,16 @@ What I have tried to do here is implement an SMPP server which connects to the b
 
 This software will be free, forever. If you get charged for this software, please notify me.
 
+### Acknowledgements
+
+This product includes software developed by the Kannel Group (http://www.kannel.org/).
+
+I'd also like to specifically thank the developer of OpenSMPPBox Rene Kluwen as I used some of his PDU conversion mechanisms in OpenSMPPBox.
+
+It makes extensive use of gwlib and other features developed for Kannel, it would not be possible without them.
+
+Special thanks to @donald-jackson for multiple contributions.
+
 If you do wish to donate to this project, please do so via the bitcoin address below.
 
 ### BTC address: 1NhLkTDiZtFTJMefvjQY4pUWM3jD641jWN
@@ -130,15 +140,6 @@ All scenarios will allow ESME's to authenticate as normal, unless the database i
 #### System restart
 * The system first starts, connects to bearerbox and allows connections from ESMEs. Once started it begins reprocessing bearerbox queues if any.
 * Once ESME's reconnect - their queued messages (in database) will begin being reprocessed.
-
-## Acknowledgements
-
-This product includes software developed by the Kannel Group (http://www.kannel.org/).
-
-I'd also like to specifically thank the developer of OpenSMPPBox Rene Kluwen as I used some of his PDU conversion mechanisms in OpenSMPPBox.
-
-It makes extensive use of gwlib and other features developed for Kannel, it would not be possible without them.
-
 
 
 
