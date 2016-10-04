@@ -526,9 +526,18 @@ SMPPEsme *smpp_esme_find_best_receiver(SMPPServer *smpp_server, Octstr *system_i
             if (!best_esme) {
                 best_esme = smpp_esme;
             } else {
-                if (counter_value(smpp_esme->outbound_queued) < counter_value(best_esme->outbound_queued)) {
+                gw_rwlock_rdlock(smpp_esme->ack_process_lock);
+                gw_rwlock_rdlock(best_esme->ack_process_lock);
+                if(dict_key_count(smpp_esme->open_acks) < dict_key_count(best_esme->open_acks)) {
+                    gw_rwlock_unlock(best_esme->ack_process_lock);
                     best_esme = smpp_esme;
+                } else if (counter_value(smpp_esme->outbound_queued) < counter_value(best_esme->outbound_queued)) {
+                    gw_rwlock_unlock(best_esme->ack_process_lock);
+                    best_esme = smpp_esme;
+                } else {
+                    gw_rwlock_unlock(best_esme->ack_process_lock);
                 }
+                gw_rwlock_unlock(smpp_esme->ack_process_lock);
             }
         }
         gwlist_destroy(options, NULL);
