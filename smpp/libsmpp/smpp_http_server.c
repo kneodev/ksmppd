@@ -133,6 +133,35 @@ SMPPHTTPCommandResult *smpp_http_command_uptime(SMPPServer *smpp_server, List *c
     
 }
 
+SMPPHTTPCommandResult *smpp_http_command_log_level(SMPPServer *smpp_server, List *cgivars, int content_type) {
+    SMPPHTTPCommandResult *smpp_http_result = smpp_http_command_result_create();
+    
+    Octstr *level = http_cgi_variable(cgivars, "level");
+
+    int new_loglevel = -1;
+
+    if(octstr_len(level)) {
+        new_loglevel = atoi(octstr_get_cstr(level));
+    }
+    
+    if(new_loglevel >= 0) {
+        log_set_log_level(new_loglevel);
+        if(content_type == HTTP_CONTENT_TYPE_PLAIN) {
+            smpp_http_result->result = octstr_format("Log level set to %d\n",new_loglevel);
+        } else if(content_type == HTTP_CONTENT_TYPE_XML) {
+            smpp_http_result->result = octstr_format("<message>Log level set to %d</message>\n",new_loglevel);
+        }
+    } else {
+        if(content_type == HTTP_CONTENT_TYPE_PLAIN) {
+            smpp_http_result->result = octstr_format("Invalid level specified\n");
+        } else if(content_type == HTTP_CONTENT_TYPE_XML) {
+            smpp_http_result->result = octstr_format("<message>Invalid level specified</message>\n");
+        }
+    }
+    
+    return smpp_http_result;
+}
+
 void smpp_http_server_request_handler(void *arg) {
     SMPPServer *smpp_server = arg;
     SMPPHTTPServer *smpp_http_server = smpp_server->http_server;
@@ -260,6 +289,7 @@ void smpp_http_server_init(SMPPServer *smpp_server) {
     }
     
     smpp_http_server_add_command(smpp_server, octstr_imm("uptime"), smpp_http_command_uptime);
+    smpp_http_server_add_command(smpp_server, octstr_imm("log-level"), smpp_http_command_log_level);
     
     smpp_http_server->start_time = time(NULL);
         

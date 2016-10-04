@@ -96,6 +96,9 @@ SINGLE_GROUP(ksmppd,
     OCTSTR(auth-method)
     OCTSTR(auth-url)
     OCTSTR(auth-plugin-id)
+
+    OCTSTR(ip-blocklist-time)
+    OCTSTR(ip-blocklist-attempts)
 )
         
 SINGLE_GROUP(smpp-routing,	

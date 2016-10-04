@@ -68,6 +68,9 @@ extern "C" {
     int smpp_listener_start(SMPPServer *smpp_server);
     void smpp_listener_shutdown(SMPPServer *smpp_server);
 
+    void smpp_listener_auth_failed(SMPPServer *smpp_server, Octstr *ip);
+    int smpp_listener_ip_is_blocked(SMPPServer *smpp_server, Octstr *ip);
+
 
 #ifdef __cplusplus
 }

@@ -106,6 +106,7 @@ SMPPDatabase *smpp_database_create() {
     smpp_database->pending_pdu = NULL;
     smpp_database->get_routes = NULL;
     smpp_database->deduct_credit = NULL;
+    smpp_database->get_esmes_with_queued = NULL;
     
     
     return smpp_database;
@@ -165,6 +166,14 @@ int smpp_database_deduct_credit(SMPPServer *smpp_server, Octstr *service, double
         return smpp_database->deduct_credit(smpp_server, service, cost);
     }
     return 0;
+}
+
+List *smpp_database_get_esmes_with_queued(SMPPServer *smpp_server) {
+    SMPPDatabase *smpp_database = smpp_server->database;
+    if(smpp_database->get_esmes_with_queued) {
+        return smpp_database->get_esmes_with_queued(smpp_server);
+    }
+    return gwlist_create();
 }
 
 void smpp_database_destroy(SMPPDatabase *smpp_database) {

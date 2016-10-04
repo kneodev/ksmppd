@@ -59,6 +59,7 @@
  * This product includes software developed by the Kannel Group (http://www.kannel.org/).
  * 
  */
+ #include <math.h>
 
 #include "gwlib/gwlib.h"
 #include "gw/smsc/smpp_pdu.h"
@@ -76,6 +77,86 @@
 #include "smpp_uuid.h"
 
 #define BEARERBOX_DEFAULT_CHARSET "UTF-8"
+
+ static int timestamp_to_minutes(Octstr *timestamp)
+{
+    struct tm tm, local;
+    time_t valutc, utc;
+    int rc, diff, dummy, localdiff;
+    char relation;
+
+    if (octstr_len(timestamp) == 0)
+        return 0;
+
+    if (octstr_len(timestamp) != 16)
+        return -1;
+
+    /*
+    * Timestamp format:
+    * YYMMDDhhmmsstnn[+-R]
+    * t - tenths of second (not used by us)
+    * nn - Time difference in quarter hours between local and UTC time
+    */
+    rc = sscanf(octstr_get_cstr(timestamp),
+            "%02d%02d%02d%02d%02d%02d%1d%02d%1c",
+            &tm.tm_year, &tm.tm_mon, &tm.tm_mday,
+            &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
+            &dummy, &diff, &relation);
+    if (rc != 9)
+       return -1;
+
+    utc = time(NULL);
+    if (utc == ((time_t)-1))
+        return 0;
+
+    if (relation == '+' || relation == '-') {
+        tm.tm_year += 100; /* number of years since 1900 */
+        tm.tm_mon--; /* month 0-11 */
+        tm.tm_isdst = -1;
+        /* convert to sec. since 1970 */
+        valutc = gw_mktime(&tm);
+        if (valutc == ((time_t)-1))
+            return -1;
+
+        /* work out local time, because gw_mktime assume local time */
+        local = gw_localtime(utc);
+        tm = gw_gmtime(utc);
+        local.tm_isdst = tm.tm_isdst = -1;
+        localdiff = difftime(gw_mktime(&local), gw_mktime(&tm));
+        valutc += localdiff;
+
+        debug("sms.smpp",0, "diff between utc and localtime (%d)", localdiff);
+        diff = diff*15*60;
+        switch(relation) {
+            case '+':
+                valutc -= diff;
+                break;
+            case '-':
+                valutc += diff;
+                break;
+        }
+    } else if (relation == 'R') { /* relative to SMSC localtime */
+        local = gw_localtime(utc);
+        local.tm_year += tm.tm_year;
+        local.tm_mon += tm.tm_mon;
+        local.tm_mday += tm.tm_mday;
+        local.tm_hour += tm.tm_hour;
+        local.tm_min += tm.tm_min;
+        local.tm_sec += tm.tm_sec;
+        valutc = gw_mktime(&local);
+        if (valutc == ((time_t)-1))
+           return -1;
+    } else {
+        return -1;
+    }
+    tm = gw_gmtime(valutc);
+    debug("sms.smpp",0,"Requested UTC timestamp: %02d-%02d-%02d %02d:%02d:%02d",
+            tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+    debug("sms.smpp", 0, "requested timestamp in min. (%ld)", (valutc - utc)/60);
+
+    return ceil ( difftime (valutc, utc) / 60 );
+}
 
 static long smpp_pdu_util_convert_addr(Octstr *id, Octstr *addr, long ton, long npi, Octstr *alt_addr_charset)
 {
@@ -727,6 +808,11 @@ Msg *smpp_submit_sm_to_msg(SMPPEsme *smpp_esme, SMPP_PDU *pdu, long *reason)
     msg->sms.pid = pdu->u.submit_sm.protocol_id;
     
     msg->sms.time = time(NULL);
+
+    /* set validity period if needed */
+    if (pdu->u.submit_sm.validity_period) {
+        msg->sms.validity = time(NULL) + timestamp_to_minutes(pdu->u.submit_sm.validity_period) * 60;
+    }
 
     /* set priority flag */
     msg->sms.priority = pdu->u.submit_sm.priority_flag;
