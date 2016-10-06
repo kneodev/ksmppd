@@ -546,21 +546,25 @@ void smpp_bearerbox_inbound_thread(void *arg) {
                         
                         if(smpp_esme) {
                             queued_outbound_pdus = smpp_pdu_msg_to_pdu(smpp_esme, msg);
-                   
-                            while((pdu = gwlist_consume(queued_outbound_pdus)) != NULL) {                        
-                                smpp_queued_deliver_pdu = smpp_queued_pdu_create();
-                                smpp_queued_deliver_pdu->pdu = pdu;
-                                smpp_queued_deliver_pdu->system_id = octstr_duplicate(smpp_esme->system_id);
-                                smpp_queued_deliver_pdu->bearerbox = smpp_bearerbox;
-                                smpp_queued_deliver_pdu->pdu->u.deliver_sm.sequence_number = counter_increase(smpp_esme->sequence_number);
-                                smpp_queued_deliver_pdu->callback = smpp_queues_callback_deliver_sm_resp;
-                                smpp_queued_deliver_pdu->context = smpp_queued_deliver_pdu;
-                                smpp_queued_deliver_pdu->smpp_esme = smpp_esme;
-                                smpp_queued_deliver_pdu->id = octstr_format("%ld", smpp_queued_deliver_pdu->pdu->u.deliver_sm.sequence_number);
-                                smpp_queued_deliver_pdu->bearerbox_id = octstr_duplicate(ack_id);
-                                smpp_queues_add_outbound(smpp_queued_deliver_pdu);
+
+                            if(queued_outbound_pdus != NULL) {
+                                while ((pdu = gwlist_consume(queued_outbound_pdus)) != NULL) {
+                                    smpp_queued_deliver_pdu = smpp_queued_pdu_create();
+                                    smpp_queued_deliver_pdu->pdu = pdu;
+                                    smpp_queued_deliver_pdu->system_id = octstr_duplicate(smpp_esme->system_id);
+                                    smpp_queued_deliver_pdu->bearerbox = smpp_bearerbox;
+                                    smpp_queued_deliver_pdu->pdu->u.deliver_sm.sequence_number = counter_increase(
+                                            smpp_esme->sequence_number);
+                                    smpp_queued_deliver_pdu->callback = smpp_queues_callback_deliver_sm_resp;
+                                    smpp_queued_deliver_pdu->context = smpp_queued_deliver_pdu;
+                                    smpp_queued_deliver_pdu->smpp_esme = smpp_esme;
+                                    smpp_queued_deliver_pdu->id = octstr_format("%ld",
+                                                                                smpp_queued_deliver_pdu->pdu->u.deliver_sm.sequence_number);
+                                    smpp_queued_deliver_pdu->bearerbox_id = octstr_duplicate(ack_id);
+                                    smpp_queues_add_outbound(smpp_queued_deliver_pdu);
+                                }
+                                gwlist_destroy(queued_outbound_pdus, NULL);
                             }
-                            gwlist_destroy(queued_outbound_pdus, NULL);
                         } else {
                             
                             if(smpp_bearerbox->smpp_bearerbox_state->smpp_server->database_enable_queue) {
