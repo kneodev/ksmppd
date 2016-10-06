@@ -203,24 +203,7 @@ static long smpp_pdu_util_convert_addr(Octstr *id, Octstr *addr, long ton, long 
                 octstr_insert_char(addr, 0, '+');
             
             break;
-        case GSM_ADDR_TON_ALPHANUMERIC:
-            if (octstr_len(addr) > 11) {
-                /* alphanum sender, max. allowed length is 11 (according to GSM specs) */
-                error(0, "SMPP[%s]: Malformed addr `%s', alphanumeric length greater 11 chars. ",
-                      octstr_get_cstr(id),
-                      octstr_get_cstr(addr));
-                reason = SMPP_ESME_RINVSRCADR;
-                goto error;
-            }
-            if (alt_addr_charset) {
-                if (octstr_str_case_compare(alt_addr_charset, "gsm") == 0)
-                    charset_gsm_to_utf8(addr);
-                else if (charset_convert(addr, octstr_get_cstr(alt_addr_charset), BEARERBOX_DEFAULT_CHARSET) != 0)
-                    error(0, "Failed to convert address from charset <%s> to <%s>, leave as is.",
-                          octstr_get_cstr(alt_addr_charset), BEARERBOX_DEFAULT_CHARSET);
-            }
-            break;
-        default: /* otherwise don't touch addr, user should handle it */
+       default: /* otherwise don't touch addr, user should handle it */
             break;
     }
 
