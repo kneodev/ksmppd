@@ -524,10 +524,10 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
         octstr_truncate(tmp_str, 12l);
 
         tm_tmp = gw_localtime(dlr_time);
-        gw_strftime(submit_date_c_str, sizeof (submit_date_c_str), "%y%m%d%H%M", &tm_tmp);
+        gw_strftime(submit_date_c_str, sizeof (submit_date_c_str), "%y%m%d%H%M%S", &tm_tmp);
 
         tm_tmp = gw_localtime(msg->sms.time);
-        gw_strftime(done_date_c_str, sizeof (done_date_c_str), "%y%m%d%H%M", &tm_tmp);
+        gw_strftime(done_date_c_str, sizeof (done_date_c_str), "%y%m%d%H%M%S", &tm_tmp);
 
         /* the msgids are in dlr->dlr_url as reported by Victor Luchitz */
         gwlist_destroy(parts, octstr_destroy_item);
