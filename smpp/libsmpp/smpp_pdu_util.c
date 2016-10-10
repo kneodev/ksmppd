@@ -318,7 +318,7 @@ Octstr *smpp_pdu_get_system_id_from_dlr_url(Octstr *received_dlr_url) {
 
 List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
     SMPP_PDU *pdu, *pdu2;
-    List *pdulist = gwlist_create(), *parts = NULL;
+    List *pdulist = gwlist_create(), *parts = NULL, *dlr_info;
     int dlrtype, catenate;
     int dlr_state = 7; /* UNKNOWN */
     long dlr_time = -1;
@@ -330,11 +330,9 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
     Octstr *msgid = NULL, *msgid2 = NULL, *dlr_status = NULL, *dlvrd = NULL;
     /* split variables */
     unsigned long msg_sequence, msg_count;
-    unsigned long submit_date;
     int max_msgs;
     Octstr *header, *footer, *suffix, *split_chars, *tmp_str = NULL;
     Octstr *dlr_service = NULL, *dlr_submit = NULL, *dlr_url = NULL;
-    long pos;
     Msg *msg2;
 
     Dict *metadata;
@@ -443,22 +441,19 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
             dict_destroy(metadata);
             return NULL;
         } else {
-            pos = octstr_search_char(msg->sms.dlr_url, '|', 0);
-            
-            if(pos != -1) {
-                dlr_service = smpp_pdu_get_system_id_from_dlr_url(msg->sms.dlr_url);
-                if(pos != -1) {
-                    dlr_submit = octstr_copy(msg->sms.dlr_url, (pos+1), (pos - octstr_len(dlr_service)));
-                    pos = octstr_search_char(msg->sms.dlr_url, '|', (pos+1));
-                    if(pos != -1) {
-                        dlr_url = octstr_copy(msg->sms.dlr_url, (pos+1), (octstr_len(msg->sms.dlr_url) - pos));
-                        dlr_time = atol(octstr_get_cstr(dlr_submit));
-                    }
-                }
-            }
-            
-            if(octstr_len(dlr_url) <= 0) {
-                error(0, "Invalid/unknown DLR-URL returned, cannot process dlr_service = %s dlr_submit = %s dlr_url = %s", octstr_get_cstr(dlr_service), octstr_get_cstr(dlr_submit), octstr_get_cstr(dlr_url));
+
+            dlr_info = octstr_split(msg->sms.dlr_url, octstr_imm("|"));
+
+            if(gwlist_len(dlr_info) == 3) {
+                dlr_service = octstr_duplicate(gwlist_get(dlr_info, 0));
+                dlr_submit = octstr_duplicate(gwlist_get(dlr_info, 1));
+                dlr_url = octstr_duplicate(gwlist_get(dlr_info, 2));
+                dlr_time = atol(octstr_get_cstr(dlr_submit));
+
+                debug("smpp.pdu.msg.to.pdu", 0, "Processed DLR service = %s, time = %ld, id(s) = %s", octstr_get_cstr(dlr_service), dlr_time, octstr_get_cstr(dlr_url));
+                gwlist_destroy(dlr_info, (void(*)(void *))octstr_destroy);
+            } else {
+                error(0, "Invalid/unknown DLR-URL returned, cannot process original = %s (%ld), dlr_service = %s dlr_submit = %s dlr_url = %s", octstr_get_cstr(msg->sms.dlr_url), gwlist_len(dlr_info), octstr_get_cstr(dlr_service), octstr_get_cstr(dlr_submit), octstr_get_cstr(dlr_url));
                 octstr_destroy(dlr_service);
                 octstr_destroy(dlr_submit);
                 octstr_destroy(dlr_url);
@@ -467,6 +462,7 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
                 octstr_destroy(msgid);
                 gwlist_destroy(parts, octstr_destroy_item);
                 dict_destroy(metadata);
+                gwlist_destroy(dlr_info, (void(*)(void *))octstr_destroy);
                 return NULL;
             }
         }
@@ -523,24 +519,15 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
         if (tmps != NULL) {
             text = tmps + (5 * sizeof (char));
         }
-
-        /* restore original submission date from service */
-        submit_date = 0;
-        if (octstr_len(dlr_service) > 0) {
-            sscanf(octstr_get_cstr(dlr_submit), "%ld", &submit_date);
-        }
-        if (!submit_date || submit_date > dlr_time) {
-            submit_date = msg->sms.time;
-        }
         
         tmp_str = octstr_create(text);
         octstr_truncate(tmp_str, 12l);
 
-        tm_tmp = gw_localtime(submit_date);
-        gw_strftime(submit_date_c_str, sizeof (submit_date_c_str), "%y%m%d%H%M", &tm_tmp);
-
         tm_tmp = gw_localtime(dlr_time);
-        gw_strftime(done_date_c_str, sizeof (done_date_c_str), "%y%m%d%H%M", &tm_tmp);
+        gw_strftime(submit_date_c_str, sizeof (submit_date_c_str), "%y%m%d%H%M%S", &tm_tmp);
+
+        tm_tmp = gw_localtime(msg->sms.time);
+        gw_strftime(done_date_c_str, sizeof (done_date_c_str), "%y%m%d%H%M%S", &tm_tmp);
 
         /* the msgids are in dlr->dlr_url as reported by Victor Luchitz */
         gwlist_destroy(parts, octstr_destroy_item);
@@ -590,31 +577,6 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
         pdu->u.deliver_sm.short_message = octstr_duplicate(msg->sms.msgdata);
     }
 
-
-    /*
-     * only re-encoding if using default smsc charset that is defined via
-     * alt-charset in smsc group and if MT is not binary
-     */
-    if (msg->sms.coding == DC_7BIT || (msg->sms.coding == DC_UNDEF && octstr_len(msg->sms.udhdata))) {
-        /* 
-         * consider 3 cases: 
-         *  a) data_coding 0xFX: encoding should always be GSM 03.38 charset 
-         *  b) data_coding 0x00: encoding may be converted according to alt-charset 
-         *  c) data_coding 0x00: assume GSM 03.38 charset if alt-charset is not defined
-         */
-        if ((pdu->u.deliver_sm.data_coding & 0xF0) ||
-                (!smpp_esme->alt_charset && pdu->u.deliver_sm.data_coding == 0)) {
-            charset_utf8_to_gsm(pdu->u.deliver_sm.short_message);
-        } else if (pdu->u.deliver_sm.data_coding == 0 && smpp_esme->alt_charset) {
-            /*
-             * convert to the given alternative charset
-             */
-            if (charset_convert(pdu->u.deliver_sm.short_message, BEARERBOX_DEFAULT_CHARSET,
-                    octstr_get_cstr(smpp_esme->alt_charset)) != 0)
-                error(0, "Failed to convert msgdata from charset <%s> to <%s>, will send as is.",
-                    BEARERBOX_DEFAULT_CHARSET, octstr_get_cstr(smpp_esme->alt_charset));
-        }
-    }
 
     /* prepend udh if present */
     if (octstr_len(msg->sms.udhdata)) {
@@ -667,6 +629,30 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
             pdu2->u.deliver_sm.short_message = octstr_cat(msg2->sms.udhdata, msg2->sms.msgdata);
         } else {
             pdu2->u.deliver_sm.short_message = octstr_duplicate(msg2->sms.msgdata);
+            /*
+             * only re-encoding if using default smsc charset that is defined via
+             * alt-charset in smsc group and if MT is not binary
+             */
+            if (msg->sms.coding == DC_7BIT || (msg->sms.coding == DC_UNDEF && octstr_len(msg->sms.udhdata))) {
+                /*
+                 * consider 3 cases:
+                 *  a) data_coding 0xFX: encoding should always be GSM 03.38 charset
+                 *  b) data_coding 0x00: encoding may be converted according to alt-charset
+                 *  c) data_coding 0x00: assume GSM 03.38 charset if alt-charset is not defined
+                 */
+                if ((pdu2->u.deliver_sm.data_coding & 0xF0) ||
+                    (!smpp_esme->alt_charset && pdu2->u.deliver_sm.data_coding == 0)) {
+                    charset_utf8_to_gsm(pdu2->u.deliver_sm.short_message);
+                } else if (pdu2->u.deliver_sm.data_coding == 0 && smpp_esme->alt_charset) {
+                    /*
+                     * convert to the given alternative charset
+                     */
+                    if (charset_convert(pdu2->u.deliver_sm.short_message, BEARERBOX_DEFAULT_CHARSET,
+                                        octstr_get_cstr(smpp_esme->alt_charset)) != 0)
+                        error(0, "Failed to convert msgdata from charset <%s> to <%s>, will send as is.",
+                              BEARERBOX_DEFAULT_CHARSET, octstr_get_cstr(smpp_esme->alt_charset));
+                }
+            }
         }
 
         pdu2->u.deliver_sm.sm_length = octstr_len(pdu2->u.deliver_sm.short_message);
