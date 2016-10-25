@@ -679,10 +679,11 @@ void smpp_queues_handle_bind_pdu(SMPPQueuedPDU *smpp_queued_pdu) {
                     auth_result->simulate_temporary_failure_every
                     );
             
-            warning(0, "SMPP[%s] Delivery simulated every %ld messages, MO every %ld messages",
+            warning(0, "SMPP[%s] Delivery simulated every %ld messages, MO every %ld messages Max open acks %ld",
                     octstr_get_cstr(smpp_queued_pdu->smpp_esme->system_id),
                     auth_result->simulate_deliver_every,
-                    auth_result->simulate_mo_every
+                    auth_result->simulate_mo_every,
+                    smpp_queued_pdu->smpp_esme->max_open_acks
                     );
 
             smpp_queued_pdu->smpp_esme->simulate = auth_result->simulate;

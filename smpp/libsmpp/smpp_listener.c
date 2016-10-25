@@ -267,6 +267,8 @@ static void smpp_listener_connection_callback(struct evconnlistener *listener, e
     smpp_esme->time_connected = time(NULL);
     smpp_esme->id = counter_value(smpp_server->esme_counter);
     smpp_esme->ip = ip;
+    smpp_esme->max_open_acks = smpp_server->default_max_open_acks;
+    
     counter_increase(smpp_server->esme_counter);
     
     event_container = event_new(base, fd, EV_TIMEOUT|EV_READ|EV_PERSIST, smpp_listener_event,
