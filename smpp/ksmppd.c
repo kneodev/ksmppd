@@ -174,7 +174,7 @@ static int check_args(int i, int argc, char **argv) {
 
     info(0, "----------------------------------------------");
     info(0, SMPP_SERVER_NAME " kmppd version %s starting", GITVERSION);
-    info(0, SMPP_SERVER_NAME " system platform ", PLATFORMINFO);   
+    info(0, SMPP_SERVER_NAME " system platform %s ", PLATFORMINFO);
     info(0, "----------------------------------------------");
 
     smpp_server->server_status = SMPP_SERVER_STATUS_RUNNING;

@@ -144,7 +144,7 @@ void smpp_queues_callback_deliver_sm_resp(void *context, long status) {
     SMPPQueuedPDU *smpp_queued_pdu = context;
     int destroy = 1;
     debug("smpp.queues.callback.deliver.sm.resp", 0, "SMPP[%s] Got deliver_sm callback status %ld %p", octstr_get_cstr(smpp_queued_pdu->system_id), status, smpp_queued_pdu);
-    if((status == SMPP_ESME_ROK) || (status == SMPP_ESME_COMMAND_STATUS_QUEUED)) {
+    if(status == SMPP_ESME_ROK) {
         if(smpp_queued_pdu->pdu && (smpp_queued_pdu->pdu->type == deliver_sm)) {
             if(smpp_queued_pdu->pdu->u.deliver_sm.esm_class & (0x04|0x08|0x20)) {
                 /* DLR */
@@ -156,6 +156,13 @@ void smpp_queues_callback_deliver_sm_resp(void *context, long status) {
                 counter_increase(smpp_queued_pdu->smpp_esme->smpp_esme_global->mo_counter);
             }
         }
+        if((smpp_queued_pdu->bearerbox) && (smpp_queued_pdu->bearerbox_id)) {
+            smpp_bearerbox_acknowledge(smpp_queued_pdu->bearerbox, smpp_queued_pdu->bearerbox_id, ack_success);
+        } else if(smpp_queued_pdu->global_id > 0) {
+            /* Database remove */
+            smpp_database_remove(smpp_queued_pdu->smpp_server, smpp_queued_pdu->global_id, 0);
+        }
+    } else if(status == SMPP_ESME_COMMAND_STATUS_QUEUED) {
         if((smpp_queued_pdu->bearerbox) && (smpp_queued_pdu->bearerbox_id)) {
             smpp_bearerbox_acknowledge(smpp_queued_pdu->bearerbox, smpp_queued_pdu->bearerbox_id, ack_success);
         } else if(smpp_queued_pdu->global_id > 0) {
