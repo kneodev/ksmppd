@@ -94,6 +94,10 @@
  }
 
  void smpp_listener_auth_failed(SMPPServer *smpp_server, Octstr *ip) {
+    if (octstr_len(smpp_server->ip_blocklist_exempt_ips) && (octstr_search(smpp_server->ip_blocklist_exempt_ips, ip, 0) > -1)) {
+       debug("smpp.listener.auth.failed", 0, "IP address %s is exempt from the IP block list", octstr_get_cstr(ip));
+       return;
+    }
     gw_rwlock_wrlock(smpp_server->ip_blocklist_lock);
     SMPPBlockedIp *smpp_blocked_ip = dict_get(smpp_server->ip_blocklist, ip);
     if(smpp_blocked_ip == NULL) {
@@ -102,6 +106,7 @@
     }
     smpp_blocked_ip->attempts++;
     smpp_blocked_ip->time_blocked = time(NULL);
+    debug("smpp.listener.auth.failed", 0, "IP address %s, attempts %ld have failed", octstr_get_cstr(ip), smpp_blocked_ip->attempts);
     gw_rwlock_unlock(smpp_server->ip_blocklist_lock);
  }
 

@@ -100,6 +100,7 @@ SINGLE_GROUP(ksmppd,
 
     OCTSTR(ip-blocklist-time)
     OCTSTR(ip-blocklist-attempts)
+    OCTSTR(ip-blocklist-exempt-ips)
 )
         
 SINGLE_GROUP(smpp-routing,	
