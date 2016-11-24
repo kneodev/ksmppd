@@ -503,7 +503,7 @@ SMPPEsme *smpp_esme_find_best_receiver(SMPPServer *smpp_server, Octstr *system_i
     SMPPEsme *best_esme = NULL, *smpp_esme;
     List *options;
     long i, num;
-    long limit;
+    long limit, current;
 
     if (smpp_global) {
         options = gwlist_create();
@@ -511,12 +511,22 @@ SMPPEsme *smpp_esme_find_best_receiver(SMPPServer *smpp_server, Octstr *system_i
         for (i = 0; i < num; i++) {
             smpp_esme = gwlist_get(smpp_global->binds, i);
             if (smpp_esme->connected && (smpp_esme->bind_type & SMPP_ESME_RECEIVE)) {
-                limit = smpp_esme->max_open_acks - dict_key_count(smpp_esme->open_acks);
+                current = counter_value(smpp_esme->outbound_queued);
+                limit = smpp_esme->max_open_acks - current;
+                debug("smpp.esme.find.best.receiver", 0, "SMPP[%s] has %ld/%ld in queues (%ld)", octstr_get_cstr(smpp_esme->system_id), current, smpp_esme->max_open_acks, limit);
                 if (limit > 0) {
                     /* Can only use binds that have space in their queues */
-                    gwlist_produce(options, smpp_esme);
+                    current = dict_key_count(smpp_esme->open_acks);
+                    limit = smpp_esme->max_open_acks - current;
+
+                    debug("smpp.esme.find.best.receiver", 0, "SMPP[%s] has %ld/%ld open acks pending (%ld)", octstr_get_cstr(smpp_esme->system_id), current, smpp_esme->max_open_acks, limit);
+                    if(limit > 0) {
+                        gwlist_produce(options, smpp_esme);
+                    } else {
+                        debug("smpp.esme.find.best.receiver", 0, "SMPP[%s] Outbound acks are full %ld/%ld", octstr_get_cstr(smpp_esme->system_id), current, smpp_esme->max_open_acks);
+                    }
                 } else {
-                    debug("smpp.esme.find.best.receiver", 0, "SMPP[%s] Outbound queue is full %ld", octstr_get_cstr(smpp_esme->system_id), dict_key_count(smpp_esme->open_acks));
+                    debug("smpp.esme.find.best.receiver", 0, "SMPP[%s] Outbound queue is full %ld/%ld", octstr_get_cstr(smpp_esme->system_id), current, smpp_esme->max_open_acks);
                 }
             }
         }

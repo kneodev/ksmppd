@@ -308,7 +308,7 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
     
     Msg *dlr = NULL;
     char *text, *tmps, err[4] = {'0', '0', '0', '\0'};
-    char submit_date_c_str[11] = {'\0'}, done_date_c_str[11] = {'\0'};
+    char submit_date_c_str[13] = {'\0'}, done_date_c_str[13] = {'\0'};
     struct tm tm_tmp;
     Octstr *msgid = NULL, *msgid2 = NULL, *dlr_status = NULL, *dlvrd = NULL;
     /* split variables */

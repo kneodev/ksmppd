@@ -809,6 +809,12 @@ void smpp_queues_outbound_thread(void *arg) {
                 smpp_queued_pdu_destroy(smpp_queued_pdu);
             }
         }
+        if(gw_prioqueue_len(smpp_server->outbound_queue) > 100) {
+            if((gw_prioqueue_len(smpp_server->outbound_queue) % 100) == 0) {
+	            warning(0, "Outbound queues are at %ld", gw_prioqueue_len(smpp_server->outbound_queue));
+            }
+        }
+ 
     }
 
     counter_decrease(smpp_server->running_threads);
@@ -866,7 +872,7 @@ void smpp_queues_requeue_thread(void *arg) {
 
         if(current_load < 1) { /* We don't want to wait a whole second before our next attempt, lets keep aggressively going while load is > 1/sec */
             debug("smpp.queues.requeue.thread", 0, "Load was %f for requeue (not busy), waiting before next check", current_load);
-            gwthread_sleep(20);
+            gwthread_sleep(1);
         } else {
             debug("smpp.queues.requeue.thread", 0, "Load was %f for requeue (busy), checking immediately", current_load);
         }
