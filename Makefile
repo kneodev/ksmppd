@@ -1,8 +1,11 @@
 SHELL = /bin/sh
 
 KANNEL_PATH=./kannel-svn-trunk
+GIT_VERSION=$(shell git describe --always --tags)
+PLATFORM_INFO=$(shell ./build/shtool-2.0.8/shtool platform -S "-" -F "%<ac>-%<sp>" --lower)
+
 CC = gcc
-CFLAGS = `${KANNEL_PATH}/gw-config --cflags` -I${KANNEL_PATH} -O1 -Wall -I. -I./smpp -I`pwd`/build/include -I/sw/include -fPIC  
+CFLAGS = `${KANNEL_PATH}/gw-config --cflags` -I${KANNEL_PATH} -O1 -Wall -I. -I./smpp -I`pwd`/build/include -I/sw/include -DGITVERSION=\"$(GIT_VERSION)\" -DPLATFORMINFO=\"$(PLATFORM_INFO)\" -fPIC  
 LIBS = `${KANNEL_PATH}/gw-config --libs` -L${KANNEL_PATH} -L/sw/lib -L/usr/lib -L`pwd`/build/libevent/.libs -levent -rdynamic -lrt
 
 # platform specific shared library extentions and flags

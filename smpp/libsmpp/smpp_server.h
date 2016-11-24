@@ -144,6 +144,9 @@ extern "C" {
         RWLock *ip_blocklist_lock;
         long ip_blocklist_time;
         long ip_blocklist_attempts;
+        Octstr *ip_blocklist_exempt_ips;
+
+        long default_max_open_acks;
     } SMPPServer;
     
     SMPPServer *smpp_server_create();

@@ -88,7 +88,8 @@ SINGLE_GROUP(ksmppd,
     OCTSTR(database-pdu-table)
     OCTSTR(database-route-table)
     OCTSTR(database-version-table)
-  
+
+    OCTSTR(default-max-open-acks)
         
     OCTSTR(inbound-queue-threads)
     OCTSTR(outbound-queue-threads)      
@@ -99,6 +100,7 @@ SINGLE_GROUP(ksmppd,
 
     OCTSTR(ip-blocklist-time)
     OCTSTR(ip-blocklist-attempts)
+    OCTSTR(ip-blocklist-exempt-ips)
 )
         
 SINGLE_GROUP(smpp-routing,	

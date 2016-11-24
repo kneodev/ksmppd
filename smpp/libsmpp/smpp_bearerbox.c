@@ -681,6 +681,7 @@ void smpp_bearerbox_requeue_thread(void *arg) {
                 if(msg->sms.sms_type == mt_push) {
                     debug("smpp.bearerbox.requeue.thread", 0, "Got MT message to requeue sender = %s receiver = %s", octstr_get_cstr(smpp_database_msg->msg->sms.sender), octstr_get_cstr(smpp_database_msg->msg->sms.receiver));
                     smpp_bearerbox_msg = smpp_bearerbox_msg_create(msg, smpp_bearerbox_requeue_result, smpp_database_msg);
+                    smpp_bearerbox_msg->msg = msg_duplicate(msg);
                     gw_prioqueue_produce(smpp_bearerbox_state->outbound_queue, smpp_bearerbox_msg);
                     busy = 1;
                 } else {

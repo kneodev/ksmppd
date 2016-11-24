@@ -94,6 +94,10 @@
  }
 
  void smpp_listener_auth_failed(SMPPServer *smpp_server, Octstr *ip) {
+    if (octstr_len(smpp_server->ip_blocklist_exempt_ips) && (octstr_search(smpp_server->ip_blocklist_exempt_ips, ip, 0) > -1)) {
+       debug("smpp.listener.auth.failed", 0, "IP address %s is exempt from the IP block list", octstr_get_cstr(ip));
+       return;
+    }
     gw_rwlock_wrlock(smpp_server->ip_blocklist_lock);
     SMPPBlockedIp *smpp_blocked_ip = dict_get(smpp_server->ip_blocklist, ip);
     if(smpp_blocked_ip == NULL) {
@@ -102,6 +106,7 @@
     }
     smpp_blocked_ip->attempts++;
     smpp_blocked_ip->time_blocked = time(NULL);
+    debug("smpp.listener.auth.failed", 0, "IP address %s, attempts %ld have failed", octstr_get_cstr(ip), smpp_blocked_ip->attempts);
     gw_rwlock_unlock(smpp_server->ip_blocklist_lock);
  }
 
@@ -267,6 +272,8 @@ static void smpp_listener_connection_callback(struct evconnlistener *listener, e
     smpp_esme->time_connected = time(NULL);
     smpp_esme->id = counter_value(smpp_server->esme_counter);
     smpp_esme->ip = ip;
+    smpp_esme->max_open_acks = smpp_server->default_max_open_acks;
+    
     counter_increase(smpp_server->esme_counter);
     
     event_container = event_new(base, fd, EV_TIMEOUT|EV_READ|EV_PERSIST, smpp_listener_event,
