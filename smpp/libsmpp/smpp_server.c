@@ -108,6 +108,7 @@ SMPPServer *smpp_server_create() {
     smpp_server->ip_blocklist_exempt_ips = NULL;
 
     smpp_server->default_max_open_acks = SMPP_ESME_DEFAULT_MAX_OPEN_ACKS;
+    smpp_server->wait_ack_action = SMPP_WAITACK_DISCONNECT;
 
     return smpp_server;
 }
@@ -217,6 +218,10 @@ int smpp_server_reconfigure(SMPPServer *smpp_server) {
                 cfg_get_integer(&smpp_server->default_max_open_acks, grp, octstr_imm("default-max-open-acks"));
 
                 info(0, "SMPP ESME Default Max Open Acks set to %ld", smpp_server->default_max_open_acks);
+
+                cfg_get_integer(&smpp_server->wait_ack_action, grp, octstr_imm("wait-ack-action"));
+
+                info(0, "SMPP Wait ack behaviour %ld", smpp_server->wait_ack_action);
 
                 debug("smpp", 0, "Blocking users for %ld seconds on %ld authentication failures", smpp_server->ip_blocklist_time, smpp_server->ip_blocklist_attempts);
 

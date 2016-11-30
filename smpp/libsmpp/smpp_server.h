@@ -76,6 +76,9 @@
 #define SMPP_SERVER_STATUS_LOG_REOPEN 4
 #define SMPP_SERVER_STATUS_SHUTDOWN 8
 
+#define SMPP_WAITACK_DISCONNECT 0
+#define SMPP_WAITACK_DROP 1
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -147,6 +150,8 @@ extern "C" {
         Octstr *ip_blocklist_exempt_ips;
 
         long default_max_open_acks;
+
+        long wait_ack_action;
     } SMPPServer;
     
     SMPPServer *smpp_server_create();

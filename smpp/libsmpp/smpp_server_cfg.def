@@ -101,6 +101,8 @@ SINGLE_GROUP(ksmppd,
     OCTSTR(ip-blocklist-time)
     OCTSTR(ip-blocklist-attempts)
     OCTSTR(ip-blocklist-exempt-ips)
+
+    OCTSTR(wait-ack-action)
 )
         
 SINGLE_GROUP(smpp-routing,	
