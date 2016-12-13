@@ -191,6 +191,7 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
                             break;
                         } else {
                             debug("smpp.route.message.database", 0, "Found matching outbound route for %s but declined sender %s", octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(msg->sms.sender));
+                            smpp_route_status->status = SMPP_ESME_RINVSRCADR;
                         }
                     } else {
                         break;
@@ -223,6 +224,7 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
                             break;
                         } else {
                             debug("smpp.route.message.database", 0, "Found matching inbound route for %s but declined sender %s", octstr_get_cstr(msg->sms.receiver), octstr_get_cstr(msg->sms.sender));
+                            smpp_route_status->status = SMPP_ESME_RINVSRCADR;
                         }
                     } else {
                         break;
