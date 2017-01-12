@@ -279,7 +279,7 @@ List *smpp_database_mysql_get_routes(SMPPServer *smpp_server, int direction, Oct
 
     DBPoolConn *conn;
 
-    sql = octstr_format("SELECT `regex`, `cost`, `system_id`, `smsc_id`, `source_regex` FROM %S WHERE direction = %d", smpp_server->database_route_table, direction);
+    sql = octstr_format("SELECT `regex`, `cost`, `system_id`, `smsc_id`, `source_regex` FROM %S WHERE direction = %d ORDER BY priority DESC", smpp_server->database_route_table, direction);
 
     if(octstr_len(service)) {
         octstr_format_append(sql, " AND system_id = ?");
@@ -319,7 +319,7 @@ List *smpp_database_mysql_get_routes(SMPPServer *smpp_server, int direction, Oct
             if(!smpp_route->regex) {
                 error(0, "Failed to compile regex %s, ignoring",octstr_get_cstr(gwlist_get(row, 0)));
             } else {
-                debug("smpp.database.mysql.get.routes", 0, "Added route direction = %d for %s from %s via %s", smpp_route->direction, octstr_get_cstr(gwlist_get(row,0)), octstr_get_cstr(gwlist_get(row, 4)), octstr_get_cstr(smpp_route->system_id));
+                debug("smpp.database.mysql.get.routes", 0, "Added route direction = %d <-> %s for %s from %s via %s", smpp_route->direction, octstr_get_cstr(gwlist_get(row,3)), octstr_get_cstr(gwlist_get(row,0)), octstr_get_cstr(gwlist_get(row, 4)), octstr_get_cstr(smpp_route->system_id));
                 gwlist_produce(routes, smpp_route);
             }
             
@@ -612,6 +612,14 @@ int smpp_database_mysql_init_tables(SMPPServer *smpp_server, SMPPDatabase *smpp_
         if(running_version < our_version) {
             octstr_destroy(sql);
             sql = octstr_format("ALTER TABLE %S ADD COLUMN source_regex text", smpp_server->database_route_table);
+            dbpool_conn_update(conn, sql, NULL);
+            running_version = our_version;
+        }
+
+        our_version = 4;
+        if(running_version < our_version) {
+            octstr_destroy(sql);
+            sql = octstr_format("ALTER TABLE %S ADD COLUMN priority int DEFAULT '0'", smpp_server->database_route_table);
             dbpool_conn_update(conn, sql, NULL);
             running_version = our_version;
         }

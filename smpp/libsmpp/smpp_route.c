@@ -214,8 +214,18 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
             num_routes = gwlist_len(routes);
             for(i=0;i<num_routes;i++) {
                 route = gwlist_get(routes, i);
+
+                found = 0;
+
+                if(octstr_len(route->smsc_id)) {
+                    if(octstr_case_compare(route->smsc_id, smsc_id) != 0) {
+                        debug("smpp.route.message.database", 0, "Cannot route messages from SMSC %s to route with SMSC %s", octstr_get_cstr(smsc_id), octstr_get_cstr(route->smsc_id));
+                        continue;
+                    }
+                }
+
                 found = gw_regex_match_pre(route->regex, msg->sms.receiver);
-                
+
                 if(found) {
                     if(route->source_regex) {
                         found = 0;
@@ -228,7 +238,7 @@ void smpp_route_message_database(SMPPServer *smpp_server, int direction, Octstr 
                         }
                     } else {
                         break;
-                    } 
+                    }
                 }
             }
             
