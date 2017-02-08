@@ -213,6 +213,7 @@ void smpp_listener_event(evutil_socket_t fd, short what, void *arg)
                 if(!smpp_esme->authenticated) { /* If there is a pending disconnect operation it means an unbind/rejected bind requested to disconnect, let outbound queue handle */
                     /* This bind is not authenticated so will never be cleaned up, lets do it here  */
                     debug("smpp.listener.event", 0, "Cleaning up disconnected ESME %ld", smpp_esme->id);
+                    smpp_listener_auth_failed(smpp_esme->smpp_server, smpp_esme->ip);
                     smpp_esme_cleanup(smpp_esme);
                 } else {
                     debug("smpp.listener.event", 0, "Allowing background thread to clean up %ld", smpp_esme->id);
@@ -227,6 +228,7 @@ void smpp_listener_event(evutil_socket_t fd, short what, void *arg)
                     
                     if(!smpp_esme->authenticated) {
                         /* This bind is not authenticated so will never be cleaned up, lets do it here  */
+                        smpp_listener_auth_failed(smpp_esme->smpp_server, smpp_esme->ip);
                         smpp_esme_cleanup(smpp_esme);
                     } else {
                         debug("smpp.listener.event", 0, "Allowing background thread to clean up mangled %ld", smpp_esme->id);
