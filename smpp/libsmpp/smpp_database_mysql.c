@@ -279,13 +279,15 @@ List *smpp_database_mysql_get_routes(SMPPServer *smpp_server, int direction, Oct
 
     DBPoolConn *conn;
 
-    sql = octstr_format("SELECT `regex`, `cost`, `system_id`, `smsc_id`, `source_regex` FROM %S WHERE direction = %d ORDER BY priority DESC", smpp_server->database_route_table, direction);
+    sql = octstr_format("SELECT `regex`, `cost`, `system_id`, `smsc_id`, `source_regex` FROM %S WHERE direction = %d ", smpp_server->database_route_table, direction);
 
     if(octstr_len(service)) {
         octstr_format_append(sql, " AND system_id = ?");
         binds = gwlist_create();
         gwlist_produce(binds, service);
     }
+
+    octstr_format_append(sql, " ORDER BY priority DESC");
     
     conn = dbpool_conn_consume(pool);
 
