@@ -170,12 +170,26 @@ void smpp_queues_callback_deliver_sm_resp(void *context, long status) {
             smpp_database_remove(smpp_queued_pdu->smpp_server, smpp_queued_pdu->global_id, 0);
         }
     } else if(status == SMPP_ESME_COMMAND_STATUS_WAIT_ACK_TIMEOUT) {
-        /* Disconnect this client for misbehaving*/
-        if((smpp_queued_pdu->bearerbox) && (smpp_queued_pdu->bearerbox_id)) {
-            smpp_bearerbox_acknowledge(smpp_queued_pdu->bearerbox, smpp_queued_pdu->bearerbox_id, ack_failed_tmp);
+        if(smpp_queued_pdu->smpp_server->wait_ack_action == SMPP_WAITACK_DISCONNECT) {
+            /* Disconnect this client for misbehaving*/
+            if ((smpp_queued_pdu->bearerbox) && (smpp_queued_pdu->bearerbox_id)) {
+                smpp_bearerbox_acknowledge(smpp_queued_pdu->bearerbox, smpp_queued_pdu->bearerbox_id, ack_failed_tmp);
+            }
+            error(0, "SMPP[%s] ESME has not ack'd message sequence %lu, disconnecting",
+                  octstr_get_cstr(smpp_queued_pdu->smpp_esme->system_id),
+                  smpp_queued_pdu->pdu->u.deliver_sm.sequence_number);
+            smpp_esme_disconnect(smpp_queued_pdu->smpp_esme);
+        } else if(smpp_queued_pdu->smpp_server->wait_ack_action == SMPP_WAITACK_DROP) {
+            error(0, "SMPP[%s] ESME has not ack'd message sequence %lu, dropping",
+                  octstr_get_cstr(smpp_queued_pdu->smpp_esme->system_id),
+                  smpp_queued_pdu->pdu->u.deliver_sm.sequence_number);
+            if((smpp_queued_pdu->bearerbox) && (smpp_queued_pdu->bearerbox_id)) {
+                smpp_bearerbox_acknowledge(smpp_queued_pdu->bearerbox, smpp_queued_pdu->bearerbox_id, ack_success);
+            } else if(smpp_queued_pdu->global_id > 0) {
+                /* Database remove */
+                smpp_database_remove(smpp_queued_pdu->smpp_server, smpp_queued_pdu->global_id, 0);
+            }
         }
-        error(0, "SMPP[%s] ESME has not ack'd message sequence %lu, disconnecting", octstr_get_cstr(smpp_queued_pdu->smpp_esme->system_id), smpp_queued_pdu->pdu->u.deliver_sm.sequence_number);
-        smpp_esme_disconnect(smpp_queued_pdu->smpp_esme);
     } else if(status == SMPP_QUEUED_PDU_DESTROYED) {
         /* Upstream is just notifying us we must destroy our context, which we do anyway */
         smpp_bearerbox_acknowledge(smpp_queued_pdu->bearerbox, smpp_queued_pdu->bearerbox_id, ack_failed_tmp);
@@ -817,6 +831,12 @@ void smpp_queues_outbound_thread(void *arg) {
                 smpp_queued_pdu_destroy(smpp_queued_pdu);
             }
         }
+        if(gw_prioqueue_len(smpp_server->outbound_queue) > 100) {
+            if((gw_prioqueue_len(smpp_server->outbound_queue) % 100) == 0) {
+	            warning(0, "Outbound queues are at %ld", gw_prioqueue_len(smpp_server->outbound_queue));
+            }
+        }
+ 
     }
 
     counter_decrease(smpp_server->running_threads);
@@ -874,7 +894,7 @@ void smpp_queues_requeue_thread(void *arg) {
 
         if(current_load < 1) { /* We don't want to wait a whole second before our next attempt, lets keep aggressively going while load is > 1/sec */
             debug("smpp.queues.requeue.thread", 0, "Load was %f for requeue (not busy), waiting before next check", current_load);
-            gwthread_sleep(20);
+            gwthread_sleep(1);
         } else {
             debug("smpp.queues.requeue.thread", 0, "Load was %f for requeue (busy), checking immediately", current_load);
         }

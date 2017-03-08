@@ -386,7 +386,7 @@ List *smpp_database_mysql_get_stored(SMPPServer *smpp_server, long sms_type, Oct
     List *pending = dict_keys(smpp_database->pending_msg);
     Octstr *pending_ids = NULL;
     if(gwlist_len(pending) > 0) {
-        info(0, "Excluding in process number %ld (last one = %s)",gwlist_len(pending), octstr_get_cstr(gwlist_get(pending, (gwlist_len(pending)-1))));
+        debug("smpp.database.mysql.get.stored", 0, "Excluding in process number %ld (last one = %s)",gwlist_len(pending), octstr_get_cstr(gwlist_get(pending, (gwlist_len(pending)-1))));
         
         pending_ids = octstr_create(" AND `global_id` NOT IN (");
         while((tmp = gwlist_consume(pending)) != NULL) {
@@ -442,7 +442,7 @@ List *smpp_database_mysql_get_stored(SMPPServer *smpp_server, long sms_type, Oct
             smpp_database_msg->msg = msg;
             smpp_database_msg->smpp_server = smpp_server;
             
-            info(0, "Adding pending msg %s", octstr_get_cstr(gwlist_get(row, 0)));
+            debug("smpp.database.mysql.get.stored", 0, "Adding pending msg %s", octstr_get_cstr(gwlist_get(row, 0)));
             dict_put(smpp_database->pending_msg, gwlist_get(row, 0), smpp_database_msg);
 
             gwlist_produce(messages, smpp_database_msg);

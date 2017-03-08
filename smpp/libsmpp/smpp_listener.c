@@ -94,6 +94,10 @@
  }
 
  void smpp_listener_auth_failed(SMPPServer *smpp_server, Octstr *ip) {
+    if (octstr_len(smpp_server->ip_blocklist_exempt_ips) && (octstr_search(smpp_server->ip_blocklist_exempt_ips, ip, 0) > -1)) {
+       debug("smpp.listener.auth.failed", 0, "IP address %s is exempt from the IP block list", octstr_get_cstr(ip));
+       return;
+    }
     gw_rwlock_wrlock(smpp_server->ip_blocklist_lock);
     SMPPBlockedIp *smpp_blocked_ip = dict_get(smpp_server->ip_blocklist, ip);
     if(smpp_blocked_ip == NULL) {
@@ -102,6 +106,7 @@
     }
     smpp_blocked_ip->attempts++;
     smpp_blocked_ip->time_blocked = time(NULL);
+    debug("smpp.listener.auth.failed", 0, "IP address %s, attempts %ld have failed", octstr_get_cstr(ip), smpp_blocked_ip->attempts);
     gw_rwlock_unlock(smpp_server->ip_blocklist_lock);
  }
 
@@ -208,6 +213,7 @@ void smpp_listener_event(evutil_socket_t fd, short what, void *arg)
                 if(!smpp_esme->authenticated) { /* If there is a pending disconnect operation it means an unbind/rejected bind requested to disconnect, let outbound queue handle */
                     /* This bind is not authenticated so will never be cleaned up, lets do it here  */
                     debug("smpp.listener.event", 0, "Cleaning up disconnected ESME %ld", smpp_esme->id);
+                    smpp_listener_auth_failed(smpp_esme->smpp_server, smpp_esme->ip);
                     smpp_esme_cleanup(smpp_esme);
                 } else {
                     debug("smpp.listener.event", 0, "Allowing background thread to clean up %ld", smpp_esme->id);
@@ -222,6 +228,7 @@ void smpp_listener_event(evutil_socket_t fd, short what, void *arg)
                     
                     if(!smpp_esme->authenticated) {
                         /* This bind is not authenticated so will never be cleaned up, lets do it here  */
+                        smpp_listener_auth_failed(smpp_esme->smpp_server, smpp_esme->ip);
                         smpp_esme_cleanup(smpp_esme);
                     } else {
                         debug("smpp.listener.event", 0, "Allowing background thread to clean up mangled %ld", smpp_esme->id);
