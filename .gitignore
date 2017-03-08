@@ -2,7 +2,9 @@
 build
 kannel-svn-trunk
 nbproject
+smpp/ksmppd
 smpp/*.o
 smpp/libsmpp/*.o
-smpp/ksmppd
+CMakeLists.txt
 *.a
+.idea

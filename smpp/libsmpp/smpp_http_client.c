@@ -307,8 +307,19 @@ void smpp_http_client_receive_thread(void *arg) {
                 }
             } else {
                 warning(0, SMPP_HTTP_HEADER_PREFIX "Route-Status indicated routing failure (code %d), rejecting", route_status);
-                smpp_http_queued_route->smpp_route_status->status = SMPP_ESME_RSUBMITFAIL;
-                smpp_http_queued_route->callback(smpp_http_queued_route->context, smpp_http_queued_route->smpp_route_status);
+                header_val = http_header_value(response_headers, octstr_imm(SMPP_HTTP_HEADER_PREFIX "Route-Error-Code"));
+                if(octstr_len(header_val)) {
+                    smpp_http_queued_route->smpp_route_status->status = atoi(octstr_get_cstr(header_val));
+                    if(smpp_http_queued_route->smpp_route_status->status == SMPP_ESME_ROK) {
+                        warning(0, "HTTP responded with Route-Error-Code indicating success, overwriting");
+                        smpp_http_queued_route->smpp_route_status->status = SMPP_ESME_RSUBMITFAIL;
+                    }
+                    smpp_http_queued_route->callback(smpp_http_queued_route->context, smpp_http_queued_route->smpp_route_status);    
+                } else {
+                    smpp_http_queued_route->smpp_route_status->status = SMPP_ESME_RSUBMITFAIL;
+                    smpp_http_queued_route->callback(smpp_http_queued_route->context, smpp_http_queued_route->smpp_route_status);    
+                }
+                octstr_destroy(header_val);
             }
         } else {
             warning(0, "No " SMPP_HTTP_HEADER_PREFIX "Route-Status header returned, failing message");
