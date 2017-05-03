@@ -828,7 +828,7 @@ void smpp_queues_outbound_thread(void *arg) {
                 /* Nothing else to do, inbound handler will process resp PDU */
             }
         } else {
-            error(0, "SMPP[%s] Client no longer connected!", octstr_get_cstr(smpp_queued_pdu->smpp_esme->system_id));
+            error(0, "SMPP[%s] Client no longer connected trying to send pdu %s!", octstr_get_cstr(smpp_queued_pdu->smpp_esme->system_id), smpp_queued_pdu->pdu->type_name);
             if(!smpp_queued_pdu->callback) {
                 smpp_queued_pdu_destroy(smpp_queued_pdu);
             }
