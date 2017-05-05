@@ -432,6 +432,9 @@ SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, O
     SMPPEsmeData *smpp_esme_data = smpp_server->esme_data;
     Octstr *tmp_system_id;
     SMPPEsmeGlobal *smpp_esme_global;
+    SMPPEsme *smpp_esme_existing;
+
+    long i, bind_count, connected_binds;
     
     if(smpp_server->authentication_method == SMPP_SERVER_AUTH_METHOD_DATABASE) {
         smpp_auth_result = smpp_database_auth(smpp_server, system_id, password);
@@ -469,7 +472,15 @@ SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, O
             smpp_esme_global = dict_get(smpp_esme_data->esmes, tmp_system_id);
             
             if(smpp_esme_global) {
-                if(gwlist_len(smpp_esme_global->binds) >= smpp_auth_result->max_binds) {
+                bind_count = gwlist_len(smpp_esme_global->binds);
+                connected_binds = 0;
+                for(i=0;i<bind_count;i++) {
+                    smpp_esme_existing = gwlist_get(smpp_esme_global->binds, i);
+                    if(smpp_esme_existing->connected) {
+                        ++connected_binds;
+                    }
+                }
+                if(connected_binds >= smpp_auth_result->max_binds) {
                     warning(0, "SMPP[%s] has exceeded its bind limit (%ld/%d), rejecting", octstr_get_cstr(tmp_system_id), gwlist_len(smpp_esme_global->binds), smpp_auth_result->max_binds);
                     smpp_esme_auth_result_destroy(smpp_auth_result);
                     smpp_auth_result = NULL;
@@ -652,7 +663,7 @@ void smpp_esme_cleanup_thread(void *arg) {
                             timediff = difftime(time(NULL), queued_ack->time_sent);
                             if ((queued_ack->time_sent > 0) && (timediff > smpp_esme->wait_ack_time)) {
                                 dict_remove(smpp_esme->open_acks, ack_key);
-				queued_ack->smpp_server = smpp_esme->smpp_server;
+				                queued_ack->smpp_server = smpp_esme->smpp_server;
                                 warning(0, "SMPP[%s] Queued ack %s has expired (diff %ld)", octstr_get_cstr(smpp_esme->system_id), octstr_get_cstr(queued_ack->id), timediff);
                                 queued_ack->callback(queued_ack, SMPP_ESME_COMMAND_STATUS_WAIT_ACK_TIMEOUT);
                             }
