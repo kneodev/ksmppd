@@ -110,6 +110,8 @@ SMPPServer *smpp_server_create() {
     smpp_server->default_max_open_acks = SMPP_ESME_DEFAULT_MAX_OPEN_ACKS;
     smpp_server->wait_ack_action = SMPP_WAITACK_DISCONNECT;
 
+    smpp_server->switch_dlr_addr = 0;
+
     return smpp_server;
 }
 
@@ -238,6 +240,8 @@ int smpp_server_reconfigure(SMPPServer *smpp_server) {
                 }
                 
                 cfg_get_bool(&smpp_server->database_enable_queue, grp, octstr_imm("database-enable-queue"));
+
+                cfg_get_bool(&smpp_server->switch_dlr_addr, grp, octstr_imm("switch-dlr-addr"));
                 
                 smpp_server->database = smpp_database_init(smpp_server);
                 

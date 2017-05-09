@@ -152,6 +152,8 @@ extern "C" {
         long default_max_open_acks;
 
         long wait_ack_action;
+
+        int switch_dlr_addr;
     } SMPPServer;
     
     SMPPServer *smpp_server_create();

@@ -60,6 +60,7 @@
  * 
  */
  #include <math.h>
+#include <gw/smsc/smpp_pdu.h>
 
 #include "gwlib/gwlib.h"
 #include "gw/smsc/smpp_pdu.h"
@@ -322,8 +323,13 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
 
     pdu = smpp_pdu_create(deliver_sm, 0);
 
-    pdu->u.deliver_sm.source_addr = octstr_duplicate(msg->sms.sender);
-    pdu->u.deliver_sm.destination_addr = octstr_duplicate(msg->sms.receiver);
+    if(smpp_esme->smpp_server->switch_dlr_addr) {
+        pdu->u.deliver_sm.destination_addr = octstr_duplicate(msg->sms.sender);
+        pdu->u.deliver_sm.source_addr = octstr_duplicate(msg->sms.receiver);
+    } else {
+        pdu->u.deliver_sm.source_addr = octstr_duplicate(msg->sms.sender);
+        pdu->u.deliver_sm.destination_addr = octstr_duplicate(msg->sms.receiver);
+    }
 
     /* Set the service type of the outgoing message. We'll use the config 
      * directive as default and 'binfo' as specific parameter. */
