@@ -358,16 +358,27 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
         }
     }
 
+    /* setup default values */
     pdu->u.deliver_sm.dest_addr_ton = GSM_ADDR_TON_NATIONAL; /* national */
     pdu->u.deliver_sm.dest_addr_npi = GSM_ADDR_NPI_E164; /* ISDN number plan */
 
-    /*
-     * if its a international number starting with +, lets remove the
-     * '+' and set number type to international instead
-     */
-    if (octstr_len(pdu->u.deliver_sm.destination_addr) && octstr_get_char(pdu->u.deliver_sm.destination_addr, 0) == '+') {
-        octstr_delete(pdu->u.deliver_sm.destination_addr, 0, 1);
-        pdu->u.deliver_sm.dest_addr_ton = GSM_ADDR_TON_INTERNATIONAL;
+    if(octstr_len(pdu->u.deliver_sm.destination_addr)) {
+        /* lets see if its international or alphanumeric sender */
+        if (octstr_get_char(pdu->u.deliver_sm.destination_addr, 0) == '+') {
+            if (!octstr_check_range(pdu->u.deliver_sm.destination_addr, 1, 256, gw_isdigit)) {
+                pdu->u.deliver_sm.dest_addr_ton = GSM_ADDR_TON_ALPHANUMERIC; /* alphanum */
+                pdu->u.deliver_sm.dest_addr_npi = GSM_ADDR_NPI_UNKNOWN; /* short code */
+            } else {
+                /* numeric sender address with + in front -> international (remove the +) */
+                octstr_delete(pdu->u.deliver_sm.destination_addr, 0, 1);
+                pdu->u.deliver_sm.dest_addr_ton = GSM_ADDR_TON_INTERNATIONAL;
+            }
+        } else {
+            if (!octstr_check_range(pdu->u.deliver_sm.destination_addr, 0, 256, gw_isdigit)) {
+                pdu->u.deliver_sm.dest_addr_ton = GSM_ADDR_TON_ALPHANUMERIC;
+                pdu->u.deliver_sm.dest_addr_npi = GSM_ADDR_NPI_UNKNOWN;
+            }
+        }
     }
 
     /* check length of src/dst address */
