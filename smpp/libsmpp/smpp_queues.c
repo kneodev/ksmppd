@@ -816,7 +816,7 @@ void smpp_queues_outbound_thread(void *arg) {
                 if (!smpp_esme->authenticated) {
                     smpp_esme_cleanup(smpp_esme);
                 } else {
-                    smpp_esme_disconnect(smpp_esme);
+                    smpp_esme_close_connection(smpp_esme);
                 }
             }
 

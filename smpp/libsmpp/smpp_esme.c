@@ -61,6 +61,7 @@
  */ 
 
 #include <ctype.h>
+#include <unistd.h>
 #include <event2/listener.h>
 #include "gwlib/gwlib.h"
 #include "gw/load.h"
@@ -1024,7 +1025,15 @@ void smpp_esme_stop_listening(SMPPEsme *smpp_esme) {
         event_free(smpp_esme->event_container);
         smpp_esme->event_container = NULL;
     }
+
     gw_rwlock_unlock(smpp_esme->event_lock);
+}
+
+void smpp_esme_close_connection(SMPPEsme *smpp_esme) {
+    if(smpp_esme->conn != NULL) {
+        int conn_fd = conn_get_id(smpp_esme->conn);
+        close(conn_fd);
+    }
 }
 
 void smpp_esme_disconnect(SMPPEsme *smpp_esme) {

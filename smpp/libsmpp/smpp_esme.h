@@ -223,6 +223,8 @@ extern "C" {
     
     SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, Octstr *password, SMPPEsme *smpp_esme);
 
+    void smpp_esme_close_connection(SMPPEsme *smpp_esme);
+
 #ifdef __cplusplus
 }
 #endif
