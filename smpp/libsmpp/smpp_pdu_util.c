@@ -323,7 +323,7 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
 
     pdu = smpp_pdu_create(deliver_sm, 0);
 
-    if(smpp_esme->smpp_server->switch_dlr_addr) {
+    if((smpp_esme->smpp_server->switch_dlr_addr) && (msg->sms.sms_type == report_mo)) {
         pdu->u.deliver_sm.destination_addr = octstr_duplicate(msg->sms.sender);
         pdu->u.deliver_sm.source_addr = octstr_duplicate(msg->sms.receiver);
     } else {
