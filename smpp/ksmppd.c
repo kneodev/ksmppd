@@ -71,7 +71,7 @@
 #include "gw/heartbeat.h"
 #include "libsmpp/smpp_server.h"
 #include "libsmpp/smpp_listener.h"
-
+#include <config.h>
 /* Global context for the SMPP Server */
 static SMPPServer *smpp_server_global;
 
