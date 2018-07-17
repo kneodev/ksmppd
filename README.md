@@ -1,4 +1,4 @@
-## No longer maintained by Kurt. [Donald Jackson](https://github.com/donald-jackson) has taken over.
+#### No longer maintained by Kurt. [Donald Jackson](https://github.com/donald-jackson) has taken over.
 
 # KSMPPD aka Kurt's SMPP Daemon
 
