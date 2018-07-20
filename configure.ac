@@ -34,6 +34,13 @@ LT_PREREQ([2.2])
 LT_INIT([dlopen])
 AC_ENABLE_SHARED
 AC_PROG_LIBTOOL(libtool)
+AC_MSG_NOTICE([Checking for libevent2 and its requirements.])
+PKG_CHECK_MODULES([libxml2], [libxml-2.0], with_libxml2=yes, with_libxml2=no)
+if test "$with_libxml2" == "no"
+then
+	AC_MSG_ERROR([libxml2 library not found ])
+	exit 1
+fi
 # check for libevent library
 AC_MSG_NOTICE([Checking for libevent2 and its requirements.])
 PKG_CHECK_MODULES([libevent], [libevent >= 2.0], with_libevent=yes, with_libevent=no)
@@ -41,8 +48,6 @@ if test "$with_libevent" == "no"
 then
         AC_MSG_ERROR([libevent library not found ])
         exit 1
-else
-        AC_DEFINE(WITH_LIBEVENT, 1 ,[libevent is Enabled])
 fi
 
 #check for shtool required to extract platform
