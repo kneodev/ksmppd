@@ -891,7 +891,7 @@ SMPPHTTPCommandResult *smpp_esme_status_command(SMPPServer *smpp_server, List *c
                     "\t<mt>%ld</mt>\n"
                     "\t<mo>%ld</mo>\n"
                     "\t<dlr>%ld</dlr>\n"
-                    "\t<errors>%ld</dlr>\n", 
+                    "\t<errors>%ld</errors>\n", 
                     key, num, 
                     smpp_esme_global->max_binds, 
                     load_get(smpp_esme_global->inbound_load, 0), load_get(smpp_esme_global->inbound_load, 1), load_get(smpp_esme_global->inbound_load, 2), 
