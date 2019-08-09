@@ -683,6 +683,15 @@ void smpp_queues_handle_bind_pdu(SMPPQueuedPDU *smpp_queued_pdu) {
         if (octstr_len(auth_result->default_smsc)) {
             smpp_queued_pdu->smpp_esme->default_smsc = octstr_duplicate(auth_result->default_smsc);
         }
+
+        if(octstr_len(auth_result->alt_charset)) {
+            debug("smpp.queues", 0, "SMPP[%s] Has requested default charset %s",
+                    octstr_get_cstr(smpp_queued_pdu->smpp_esme->system_id), 
+                    octstr_get_cstr(auth_result->alt_charset)
+                    );
+            smpp_queued_pdu->smpp_esme->alt_charset = octstr_duplicate(auth_result->alt_charset);
+        }
+
         smpp_queued_pdu->smpp_esme->default_cost = auth_result->default_cost;
 
         if (auth_result->simulate) {
