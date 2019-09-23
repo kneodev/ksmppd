@@ -194,6 +194,19 @@ extern "C" {
         Counter *dlr_counter;
         Counter *error_counter;
     } SMPPEsme;
+
+    typedef struct {
+        Dict *esmes;
+        RWLock *lock;
+        long cleanup_thread_id;
+        int g_thread_id;
+        RWLock *cleanup_lock;
+        List *cleanup_queue;
+        Load *inbound_load;
+        Load *outbound_load;
+        Counter *inbound_processed;
+        Counter *outbound_processed;
+    } SMPPEsmeData;
     
     SMPPESMEAuthResult *smpp_esme_auth_result_create();
     

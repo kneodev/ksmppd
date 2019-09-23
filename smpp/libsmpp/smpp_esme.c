@@ -78,19 +78,6 @@
 #include "smpp_route.h"
 #include "smpp_plugin.h"
 
-typedef struct {
-    Dict *esmes;
-    RWLock *lock;
-    long cleanup_thread_id;
-    int g_thread_id;
-    RWLock *cleanup_lock;
-    List *cleanup_queue;
-    Load *inbound_load;
-    Load *outbound_load;
-    Counter *inbound_processed;
-    Counter *outbound_processed;
-} SMPPEsmeData;
-
 
 SMPPESMEAuthResult *smpp_esme_auth_result_create() {
     SMPPESMEAuthResult *smpp_esme_auth_result = gw_malloc(sizeof(SMPPESMEAuthResult));
@@ -153,11 +140,9 @@ void smpp_esme_cleanup(SMPPEsme *smpp_esme) {
 
     smpp_esme_stop_listening(smpp_esme);
 
-    gw_rwlock_wrlock(smpp_esme_data->cleanup_lock);
     debug("smpp.esme.cleanup", 0, "SMPP[%s] Adding %ld to cleanup queue", octstr_get_cstr(smpp_esme->system_id), smpp_esme->id);
     smpp_esme->connected = 0;
     gwlist_append_unique(smpp_esme_data->cleanup_queue, smpp_esme, smpp_esme_compare);
-    gw_rwlock_unlock(smpp_esme_data->cleanup_lock);
 }
 
 SMPPEsmeGlobal *smpp_esme_global_create() {
@@ -406,7 +391,6 @@ List *smpp_esme_global_get_queued(SMPPServer *smpp_server) {
 
 void smpp_esme_global_add(SMPPServer *smpp_server, SMPPEsme *smpp_esme) {
     SMPPEsmeData *smpp_esme_data = smpp_server->esme_data;
-    gw_rwlock_wrlock(smpp_esme_data->lock);
 
     Octstr *key = octstr_duplicate(smpp_esme->system_id);
     octstr_convert_range(key, 0, octstr_len(key), tolower);
@@ -424,7 +408,6 @@ void smpp_esme_global_add(SMPPServer *smpp_server, SMPPEsme *smpp_esme) {
     gwlist_produce(smpp_global->binds, smpp_esme);
 
     octstr_destroy(key);
-    gw_rwlock_unlock(smpp_esme_data->lock);
 }
 
 SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, Octstr *password, SMPPEsme *smpp_esme) {
@@ -458,9 +441,8 @@ SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, O
             }
         }
     }
-    
-    if(smpp_auth_result) {   
-        gw_rwlock_wrlock(smpp_esme_data->lock);
+
+    if(smpp_auth_result) {
         /* Successful authentication, lets check max binds */
         if(smpp_auth_result->max_binds > 0) {
             tmp_system_id = octstr_duplicate(system_id);
@@ -479,7 +461,6 @@ SMPPESMEAuthResult *smpp_esme_auth(SMPPServer *smpp_server, Octstr *system_id, O
             }
             octstr_destroy(tmp_system_id);
         }
-        gw_rwlock_unlock(smpp_esme_data->lock);
     }
 
     if(!smpp_auth_result) {
@@ -684,8 +665,6 @@ void smpp_esme_cleanup_thread(void *arg) {
 
         gwlist_destroy(keys, (void(*)(void *))octstr_destroy);
 
-        gw_rwlock_wrlock(smpp_esme_data->cleanup_lock);
-
         num = gwlist_len(smpp_esme_data->cleanup_queue);
 
         if (num > 0) {
@@ -715,7 +694,7 @@ void smpp_esme_cleanup_thread(void *arg) {
             smpp_esme_data->cleanup_queue = replace;
         }
 
-        gw_rwlock_unlock(smpp_esme_data->cleanup_lock);
+        info(0, "UNLOCK smpp_eserver->esme_data->lock 22");
         gw_rwlock_unlock(smpp_esme_data->lock);
 
         gwthread_sleep(SMPP_ESME_CLEANUP_INTERVAL);
@@ -802,6 +781,7 @@ SMPPHTTPCommandResult *smpp_esme_status_command(SMPPServer *smpp_server, List *c
     SMPPEsmeData *smpp_esme_data = smpp_server->esme_data;
     
     smpp_http_command_result->result = octstr_create("");
+    info(0, "READLOCK: smpp_server->esme_data->lock 25");
     gw_rwlock_rdlock(smpp_esme_data->lock);
     
     Octstr *key;
