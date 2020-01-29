@@ -633,7 +633,7 @@ void smpp_esme_cleanup_thread(void *arg) {
                             timediff = difftime(time(NULL), queued_ack->time_sent);
                             if ((queued_ack->time_sent > 0) && (timediff > smpp_esme->wait_ack_time)) {
                                 dict_remove(smpp_esme->open_acks, ack_key);
-				queued_ack->smpp_server = smpp_esme->smpp_server;
+				                queued_ack->smpp_server = smpp_esme->smpp_server;
                                 warning(0, "SMPP[%s] Queued ack %s has expired (diff %ld)", octstr_get_cstr(smpp_esme->system_id), octstr_get_cstr(queued_ack->id), timediff);
                                 queued_ack->callback(queued_ack, SMPP_ESME_COMMAND_STATUS_WAIT_ACK_TIMEOUT);
                             }
@@ -694,7 +694,6 @@ void smpp_esme_cleanup_thread(void *arg) {
             smpp_esme_data->cleanup_queue = replace;
         }
 
-        info(0, "UNLOCK smpp_eserver->esme_data->lock 22");
         gw_rwlock_unlock(smpp_esme_data->lock);
 
         gwthread_sleep(SMPP_ESME_CLEANUP_INTERVAL);
@@ -781,7 +780,6 @@ SMPPHTTPCommandResult *smpp_esme_status_command(SMPPServer *smpp_server, List *c
     SMPPEsmeData *smpp_esme_data = smpp_server->esme_data;
     
     smpp_http_command_result->result = octstr_create("");
-    info(0, "READLOCK: smpp_server->esme_data->lock 25");
     gw_rwlock_rdlock(smpp_esme_data->lock);
     
     Octstr *key;
