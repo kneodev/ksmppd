@@ -584,9 +584,14 @@ List *smpp_pdu_msg_to_pdu(SMPPEsme *smpp_esme, Msg *msg) {
         msg_sequence = 0;
     }
 
-    /* split sms */
-    parts = sms_split(msg, header, footer, suffix, split_chars, catenate,
-            msg_sequence, max_msgs, MAX_SMS_OCTETS);
+    if(msg->sms.msgdata != NULL) {
+        /* split sms */
+        parts = sms_split(msg, header, footer, suffix, split_chars, catenate,
+                          msg_sequence, max_msgs, MAX_SMS_OCTETS);
+    } else {
+        parts = gwlist_create();
+        gwlist_produce(parts, msg_duplicate(msg));
+    }
 
     msg_count = gwlist_len(parts);
 

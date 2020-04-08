@@ -83,7 +83,7 @@
 SMPPRouteStatus *smpp_route_status_create(Msg *msg) {
     SMPPRouteStatus *smpp_route_status = gw_malloc(sizeof(SMPPRouteStatus));
     
-    if(msg && (msg_type(msg) == sms)) {
+    if(msg && (msg_type(msg) == sms) && (msg->sms.msgdata != NULL)) {
         List *parts = sms_split(msg, NULL, NULL, NULL, NULL, 1, 1, 255, MAX_SMS_OCTETS);
         smpp_route_status->parts = gwlist_len(parts);
         gwlist_destroy(parts, (void(*)(void *))msg_destroy);
