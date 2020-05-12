@@ -897,7 +897,7 @@ SMPPHTTPCommandResult *smpp_esme_status_command(SMPPServer *smpp_server, List *c
                         "\t\t<mt>%ld</mt>\n"
                         "\t\t<mo>%ld</mo>\n"
                         "\t\t<dlr>%ld</dlr>\n"
-                        "\t\t<dlr>%ld</dlr>\n"
+                        "\t\t<errors>%ld</errors>\n"
                         "\t</bind>\n",
                         smpp_esme->id,
                         smpp_esme->ip,
