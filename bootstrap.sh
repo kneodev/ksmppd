@@ -1,11 +1,13 @@
 #!/bin/bash
 
 
-REVISION="5173"
+REVISION="5297"
 NAME="ksmppd"
 SVN=`which svn`
 PATCH=`which patch`
 CURL=`which curl`
+ACLOCAL=`which aclocal`
+LIBTOOLIZE=`which libtoolize`
 
 function safe_exec {
     if ! $1 ; then
@@ -30,6 +32,17 @@ if [ -z "$CURL" ]; then
     exit 1;
 fi
 
+if [ -z "$ACLOCAL" ]; then
+    echo "You need automake on your \$PATH to build $NAME"
+    exit 1;
+fi
+
+if [ -z "$LIBTOOLIZE" ]; then
+    echo "You need libtool on your \$PATH to build $NAME"
+    exit 1;
+fi
+
+
 CMD="$SVN checkout -r $REVISION https://svn.kannel.org/gateway/trunk kannel-svn-trunk"
 
 safe_exec "$CMD"
@@ -41,13 +54,18 @@ mkdir -p $BUILD_PATH
 
 cd kannel-svn-trunk
 
-safe_exec "./configure --prefix=$BUILD_PATH --with-mysql --enable-ssl --enable-start-stop-daemon"
+safe_exec "./bootstrap.sh"
+
+safe_exec "./configure --prefix=$BUILD_PATH --with-mysql --enable-ssl --enable-start-stop-daemon --enable-static"
 
 patch -p0 < "../kannel-svn-r${REVISION}.patch"
 
-safe_exec "make libgw.a libgwlib.a libwap.a gw-config"
+safe_exec "make"
+
+make install
 
 cd $BUILD_PATH
+
 safe_exec "curl -O -L ftp://ftp.gnu.org/gnu/shtool/shtool-2.0.8.tar.gz"
 
 tar zxvf shtool-2.0.8.tar.gz
@@ -58,11 +76,11 @@ make
 
 cd ..
 
-safe_exec "curl -O -L  https://github.com/libevent/libevent/releases/download/release-2.0.22-stable/libevent-2.0.22-stable.tar.gz"
+safe_exec "curl -O -L  https://github.com/libevent/libevent/releases/download/release-2.1.11-stable/libevent-2.1.11-stable.tar.gz"
 
-tar zxvf libevent-2.0.22-stable.tar.gz
+tar zxvf libevent-2.1.11-stable.tar.gz
 
-safe_exec "cd libevent-2.0.22-stable"
+safe_exec "cd libevent-2.1.11-stable"
 
 safe_exec "./configure --prefix=$BUILD_PATH"
 
@@ -72,7 +90,9 @@ make install
 
 safe_exec "cd $BUILD_PATH"
 
-ln -s libevent-2.0.22-stable libevent
+rm -f lib/*.so
+
+ln -s libevent-2.1.11-stable libevent
 
 safe_exec "cd libevent/.libs"
 

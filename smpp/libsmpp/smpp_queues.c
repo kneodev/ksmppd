@@ -731,6 +731,7 @@ void smpp_queues_handle_bind_pdu(SMPPQueuedPDU *smpp_queued_pdu) {
 void smpp_queues_inbound_thread(void *arg) {
     SMPPServer *smpp_server = arg;
     SMPPQueuedPDU *smpp_queued_pdu;
+    SMPPEsmeData *smpp_esme_data = smpp_server->esme_data;
 
     debug("smpp.queues.inbound.thread", 0, "Starting inbound PDU processor thread");
 
@@ -744,6 +745,8 @@ void smpp_queues_inbound_thread(void *arg) {
         smpp_queued_pdu->smpp_esme->time_last_queue_process = time(NULL);
         counter_decrease(smpp_queued_pdu->smpp_esme->inbound_queued);
         counter_increase(smpp_queued_pdu->smpp_esme->inbound_processed);
+
+        gw_rwlock_rdlock(smpp_esme_data->lock);
 
         switch (smpp_queued_pdu->pdu->type) {
             case bind_transmitter:
@@ -772,6 +775,8 @@ void smpp_queues_inbound_thread(void *arg) {
                 smpp_queued_pdu_destroy(smpp_queued_pdu);
                 break;
         }
+
+        gw_rwlock_unlock(smpp_esme_data->lock);
         
         if(gw_prioqueue_len(smpp_server->inbound_queue) > 100) {
             warning(0, "Inbound queues are at %ld", gw_prioqueue_len(smpp_server->inbound_queue));
