@@ -1,3 +1,5 @@
+#### No longer maintained by Kurt. [Donald Jackson](https://github.com/donald-jackson) has taken over.
+
 # KSMPPD aka Kurt's SMPP Daemon
 
 This is my attempt at an alternative to OpenSMPPBox and the Commercial SMPPBox available
