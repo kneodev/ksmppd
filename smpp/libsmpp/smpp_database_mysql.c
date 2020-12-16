@@ -105,6 +105,16 @@
  
  */
 
+static Octstr * smpp_pdu_pack_without_command_length(Octstr *smsc_id, SMPP_PDU *pdu){
+          Octstr *os = smpp_pdu_pack(smsc_id, pdu);
+          Octstr *result = octstr_copy(os, 4, octstr_len(os) - 4);
+          octstr_destroy(os);
+          if(result == NULL){
+                  result = octstr_create("");
+          }
+          return result;
+}
+
 int smpp_database_mysql_remove_stored_pdu(SMPPServer *smpp_server, Octstr *global_id) {
     SMPPDatabase *smpp_database = smpp_server->database;
     Octstr *sql;
@@ -701,7 +711,7 @@ int smpp_database_mysql_add_pdu(SMPPServer *smpp_server, SMPPQueuedPDU *smpp_que
 
     gwlist_produce(binds, octstr_duplicate(smpp_queued_pdu->system_id));
     gwlist_produce(binds, octstr_format("%ld", smpp_queued_pdu->time_sent));
-    gwlist_produce(binds, smpp_pdu_pack_real(smpp_queued_pdu->system_id, smpp_queued_pdu->pdu, 0));
+    gwlist_produce(binds, smpp_pdu_pack_without_command_length(smpp_queued_pdu->system_id, smpp_queued_pdu->pdu));
 
     conn = dbpool_conn_consume(pool);
 
