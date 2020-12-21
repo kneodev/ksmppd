@@ -45,9 +45,37 @@ If you do wish to donate to this project, please do so via the bitcoin address b
 
 ## Building
 
-I'm aware that this build script is not the best way of doing things and should rather use autoconf - however while I am an experienced C developer I've never taken the time to learn this. If someone wants to contribute an autoconf script via a pull request I will happily accept.
+Thanks to [rajesh6115](https://github.com/rajesh6115) this build can now be completed using autotools.
 
-To build:
+### Dependencies
+
+
+#### Kannel
+
+You need to have kannel installed with MySQL support in order to compile successfully. If you don't have kannel installed, you can do so by executing the following commands.
+
+    svn co https://svn.kannel.org/gateway/trunk kannel-trunk
+    cd kannel-trunk
+    ./bootstrap.sh
+    ./configure --with-mysql
+    make
+    sudo make install
+
+Assuming the above is done successfully (you may need to install MySQL, libxml2, etc dependencies to successfully build).
+
+#### Other dependencies
+
+libevent
+
+    yum install -y libevent-devel
+
+shtool
+
+    rpm -i https://download-ib01.fedoraproject.org/pub/epel/7/x86_64/Packages/s/shtool-2.0.8-11.el7.noarch.rpm
+    
+### Building KSMPPD
+
+Now that you have the dependencies ready you can do the following.
 
     git clone https://github.com/kneodev/ksmppd.git
     cd ksmppd
