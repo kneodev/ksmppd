@@ -1,0 +1,5 @@
+set -e
+
+autoreconf -iv
+
+
