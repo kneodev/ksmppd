@@ -57,7 +57,7 @@ You need to have kannel installed with MySQL support in order to compile success
     svn co https://svn.kannel.org/gateway/trunk kannel-trunk
     cd kannel-trunk
     ./bootstrap.sh
-    ./configure --with-mysql
+    ./configure --with-mysql --enable-ssl --enable-start-stop-daemon --enable-static
     make
     sudo make install
 
@@ -68,10 +68,6 @@ Assuming the above is done successfully (you may need to install MySQL, libxml2,
 libevent
 
     yum install -y libevent-devel
-
-shtool
-
-    rpm -i https://download-ib01.fedoraproject.org/pub/epel/7/x86_64/Packages/s/shtool-2.0.8-11.el7.noarch.rpm
     
 ### Building KSMPPD
 
