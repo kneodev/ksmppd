@@ -12,4 +12,4 @@ bin_PROGRAMS = ksmppd
 ksmppd_SOURCES =  ksmppd.c
 ksmppd_CPPFLAGS = -I ${top_srcdir}/smpp/libsmpp `gw-config --cflags`
 ksmppd_LDFLAGS = `gw-config --libs` ${libevent_LIBS} -ldl
-ksmppd_LDADD= ${top_srcdir}/smpp/libsmpp.la ${libevent_LIBS}
+ksmppd_LDADD= libsmpp.la ${libevent_LIBS}
